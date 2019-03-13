@@ -1,8 +1,12 @@
 #### Install packages ####
-install.packages(c("devtools", "readxl", "ape", "geojsonio",
-                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA"))
+# install.packages(c("devtools", "readxl", "ape", "geojsonio",
+#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA"),
+#                  dependencies = TRUE)
 
 devtools::install_github("pkimes/sigclust2")
+devtools::install_version("rgdal", 
+                          version = "1.3-9",
+                          repos = "http://cran.us.r-project.org")
 
 #### load packages ####
 library(sigclust2)        # For clustering
@@ -262,39 +266,12 @@ subdom_test("crime")
 subdom_test("housing")
 subdom_test("living")
 
-# Visualise cluster profiles with polar co-ordinates
-
-g3 <- ggplot(data = cluster_table %>%
-                    gather(key = "variable",
-                           value = "value",
-                           -cluster,
-                           -num_las,
-                           -avg_imd_sc,
-                           factor_key = TRUE),
-             aes(x = variable,
-                 y = value,
-                 colour = factor(cluster))) +
-      geom_point() +
-      geom_line(aes(group = factor(cluster))) +
-      facet_wrap(~cluster) +
-      coord_polar() +
-      geom_hline(yintercept = 0) +
-      ggtitle("Cluster profiles") +
-      theme_minimal() +
-      scale_color_brewer(type = "qualitative",
-                         palette = "Set1") +
-      scale_y_continuous(limits = c(-2, 2.5)) +
-      guides(colour = FALSE) +
-      labs(y = NULL,
-           x = NULL)
-      
-
 g4 <- ggplot(data = cluster_table %>%
                gather(key = "variable",
                       value = "value",
                       -cluster,
                       -num_las,
-                      -avg_imd_sc,
+                      -IMD_score,
                       factor_key = TRUE),
              aes(x = variable,
                  y = value,
