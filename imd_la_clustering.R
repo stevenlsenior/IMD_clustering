@@ -1,5 +1,11 @@
+#### Install packages ####
+install.packages(c("devtools", "readxl", "ape", "geojsonio",
+                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA"))
+
+devtools::install_github("pkimes/sigclust2")
+
 #### load packages ####
-library(sigclust2)        # For clusteirng
+library(sigclust2)        # For clustering
 library(devtools)         # For installing packages
 library(readxl)           # For reading excel files
 library(ape)              # For plotting dendrograms
@@ -10,6 +16,7 @@ library(ggalt)            # For mapping
 library(broom)            # For tidying map data
 library(tidyverse)        # For data manipulation
 library(FSA)              # For Dunn's test
+
 source("multiplot.R")
 
 #### Download files ####
