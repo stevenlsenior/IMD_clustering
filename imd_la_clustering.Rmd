@@ -1,0 +1,273 @@
+---
+title: "Hierarchical clustering of English local authorities by sub-domains of the English Indices of Multiple Deprivation"
+author: "Steven L. Senior, Specialty Registrar in Public Health, Division of Population Health, Health Services Research & Primary Care, University of Manchester, UK."
+output: html_notebook
+---
+
+# ABSTRACT  
+
+## Background  
+
+The English Indices of Multiple Deprivation (IMD) is widely used as a measure of deprivation of geographic areas in analyses of health inequalities between places. However, similarly ranked areas can differ substantially in the underlying sub-domains and indicators that are used to calculate the IMD score. These sub-domains and indicators contain a richer set of data that might be useful for classifying local authorities. Clustering methods offer a set of techniques to identify groups of areas with similar patterns of deprivation. This could offer insights into areas that face similar challenges.
+
+## Methods  
+
+Hierarchical agglomerative (i.e. bottom-up) clustering methods were applied to sub-domain scores for 152 upper-tier local authorities. Recent advances in statistical testing allow clusters to be identified that are unlikely to have arisen from random partitioning of a homogeneous group.
+
+## Results  
+
+Five statistically significant clusters of local authorities were identified. These clusters represented local authorities that were: 
+1.     Most deprived, predominantly urban;
+2.    Least deprived, predominantly rural;
+3.    Less deprived, rural;
+4.    Deprived, high crime, high barriers to housing; and
+5.    Deprived, low education, poor employment, poor health.
+
+## Conclusion
+
+Hierarchical clustering methods can be used to identify five distinct clusters that do not correspond closely to quintiles of deprivation. These methods can be used to draw on the richer set of information contained in the IMD sub-domains and may help to identify places that face similar challenges, and places that appear similar in terms of IMD scores, but that face different challenges.
+
+# INTRODUCTION
+
+The English Indices of Multiple Deprivation (IMD) is widely used as a measure of relative deprivation of geographic areas. It underpins many analyses of inequalities in health between places.  
+
+An area's overall IMD score is a weighted sum of seven sub-domains of deprivation. Each of the sub-domains is made from a weighted sum of one or more indicators.  
+
+While the overall score or rank of an area is useful as a single summary of relative multiple deprivation, similarly ranked areas can be quite different in their sub-domain scores. 
+
+### Example: North East Lincolnshire and South Tyneside:
+Ranked 25th (North East Lincolnshire) and 26th (South Tyneside) most deprived. Both in the second most deprived decile overall.  
+
+But in terms of health deprivation they are ranked 66th and 12th most deprived respectively.
+This puts South Tyneside in the most deprived decile for health, but North East Lincolnshire in the fifth most deprived decile for health.  
+
+This suggests that (i) grouping areas into quintiles or deciles may group together quite different areas, and (ii) the sub-domains of deprivation offer a richer picture of deprivation.  
+
+### Clustering techniques as an alternative method for grouping areas
+
+Clustering techniques offer a way to find groups of areas that have similar patterns of deprivation. They have been used previously on health outcomes (Bellis et al, 2012).
+Hierarchical clustering identifies groups of entities based on some measure of similarity across scores. These algorithms produce a tree-like breakdown of all areas. This avoids the need for the analyst to pre-specify the number of clusters to be found (as in K-means clustering).
+
+Agglomerative (i.e. bottom-up) clustering starts with all the areas, and merges areas into clusters one at a time, starting with the most similar pair.
+Advances in statistical methods allow significance testing at each branch in the tree to ask whether the observed clusters could have arisen by chance, while controlling for multiple testing (Kimes et al, 2017). This offers a way to identify potentially meaningful clusters, and reduce the chance of identifying spurious clusters.
+
+The aim of this paper is to apply heirarchical agglomerative clustering techniques to domains of deprivation to explore patterns of deprivation among upper-tier local authorities in England. It aims to test the usefulness of unsupervised statistical learning methods in understanding the challenges faced by local authorities.
+
+# METHODS
+
+## Data sources and processing  
+
+```{r installing and loading packages and getting data, message = FALSE, warning = FALSE}
+#### Install packages ####
+#install.packages(c("devtools", "readxl", "ape", "geojsonio",
+#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
+#                   "cowplot"),
+#                 dependencies = TRUE)
+
+#### load packages ####
+library(sigclust2)        # For clustering
+library(devtools)         # For installing packages
+library(readxl)           # For reading excel files
+library(ape)              # For plotting dendrograms
+library(geojsonio)        # For managing geojson
+library(rgdal)            # For mapping
+library(GISTools)         # For mapping
+library(ggalt)            # For mapping
+library(broom)            # For tidying map data
+library(tidyverse)        # For data manipulation
+library(FSA)              # For Dunn's test
+library(knitr)            # For pretty tables
+library(cowplot)          # For plotting figures
+
+#### Download files ####
+
+if(!file.exists("imd_la.xlsx")){
+  download.file(url = "https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/464465/File_11_ID_2015_Upper-tier_Local_Authority_Summaries.xlsx",
+                destfile = "imd_la.xlsx")
+}
+
+#### Load data ####
+
+imd_la <- read_xlsx(path = "imd_la.xlsx",
+                    sheet = 2)
+
+for(i in 3:11){
+  t <- read_xlsx(path = "imd_la.xlsx",
+                 sheet = i)
+  imd_la <- merge(imd_la, t,
+                  by = 1:2)
+}
+
+rm(t)
+
+#### Data Pre-Processing ####
+
+# Use average scores
+imd_la_subdoms <- dplyr::select(imd_la,
+                                1:2,
+                                contains("Average score"),
+                                -contains("Rank")) 
+
+# rename variables
+names(imd_la_subdoms) <- c("id",
+                           "area_name",
+                           "imd_avg_sc",
+                           "income_avg_sc",
+                           "employ_avg_sc",
+                           "educ_skill_avg_sc",
+                           "health_avg_sc",
+                           "crime_avg_sc",
+                           "housing_avg_sc",
+                           "living_env_avg_sc",
+                           "IDACI_avg_score",
+                           "IDAOPI_avg_score")
+
+# Create IMD quintiles variable
+imd_la_subdoms <- mutate(imd_la_subdoms,
+                         imd_quintile = ntile(imd_avg_sc, n = 5))
+
+imd_la_subdoms <- imd_la_subdoms[ , c(1:2, 13, 3:12)]
+
+#### Centre and scale variables ####
+
+for(i in 5:ncol(imd_la_subdoms)){
+  imd_la_subdoms[,i] <- (imd_la_subdoms[,i] - mean(imd_la_subdoms[,i])) / sd(imd_la_subdoms[,i])
+}
+```
+
+IMD data were downloaded from the website of the Ministry of Housing, Communities and Local Government (Ministry of Housing, Communities and Local Government 2015). Geographic data were downloaded from the Office for National Statistics Open Geography Portal (geoportal.statistics.gov.uk/datasets/). 
+
+The IMD summary statistics for upper-tier local authorities include a range of scores that summarise the IMD scores of each local authority’s component LSOAs. These include the average of LSOA scores in each sub-domain, and the proportion of LSOAs in a given local authority in the lowest 10% nationally. For simplicity, this study uses only the average scores for each local authority for the seven sub-domains of deprivation. Average scores for each local authority were centered and scaled to mean 0 and standard deviation of 1. This prevents the distribution of any variable affecting its weight in the clustering analysis. All sub-domains were weighted equally.
+
+## Statistical analysis 
+
+This study uses a hierarchical agglomerative (i.e. bottom-up) clustering algorithm. The algorithm computes the Euclidean distance between each local authority based on average scores on the seven sub-domains of deprivation. The algorithm then identifies the two local authorities that have the lowest distance score and links them in a cluster. The algorithm then repeats this process until only one cluster remains containing all the local authorities. A key decision is the choice of linkage method - the method for calculating the distance between clusters and other clusters or points. Here, the ‘complete’ linkage method is used, where the distance between two clusters is the distance between their two farthest points **[why this method?]**. Sensitivity analysis using other methods were conducted.
+
+Statistical analysis was done in R  version 3.5.0 (R Development Core Team 2008).  Hierarchical clustering was done using the sigclust2 package (Kimes et al. 2017). This package enables testing for statistical significance of clustering. At each node, the algorithm computes the two-mean cluster index, a measure of the extent to which observations within the two clusters vary relative to the overall variation in the data set (small values indicating tighter clustering). The value of the cluster index at each node is then compared to the distribution expected under the null hypothesis that both clusters are drawn from a single gaussian distribution. This produces a p-value for each node in the clustering structure indicating the likelihood that a cluster index that large or larger could have arisen by chance. Nodes with p-values less than 0.001 were treated as statistically significant. To correct for multiple testing, the algorithm applies a family-wise error rate correction, which shrinks the critical value at which the clustering at a given node is judged to be statistically significant. If a node has a p-value greater than 0.001, the algorithm does not test nodes below it in the clustering hierarchy. Using this approach, the number of clusters identified is determined by the significance level, rather than being decided in advance by the researcher, or being based on an arbitrary cut-off point on the clustering tree.
+
+```{r heirarchical clustering, warning=FALSE, message=FALSE}
+#### Heirarchical clustering with sigclust2 ####
+
+# Perform clustering with shc()
+shc_result <- shc(as.matrix(imd_la_subdoms[,5:11]),
+                  linkage = "complete",
+                  alpha = 0.001,
+                  n_sim = 500)
+
+# Create variable identifying the cluster for each local authority
+imd_la_subdoms <- mutate(imd_la_subdoms,
+                         cluster = factor(shcutree(shc_result)))
+```
+
+
+# RESULTS
+
+## Hierarchical clustering
+
+Figure 1a shows the clustering structure as a dendrogram. Statistically significant clustering is identified by red branches in the dendrogram, and associated p-values are displayed where the clustering at that node was statistically significant. Five statistically significant clusters were identified. Figure 1b shows the geographic distribution of the five significant clusters.
+
+```{r figure 1, warning=FALSE, message=FALSE, fig.height=15, fig.width=10}
+# 1A: Plot dendrogram
+fig1a <- plot(shc_result,
+              use_labs = FALSE,
+              groups = shcutree(shc_result)) + 
+       theme_minimal() +
+       scale_fill_brewer(type = "qualitative",
+                         palette = "Set1",
+                         name = "Cluster") +
+       labs(title = "Clustering dendrogram") 
+
+# 1B: mapping clusters
+# Get map data
+if(!file.exists("la_map.Rdata")){
+  la_map <- geojson_read("https://opendata.arcgis.com/datasets/d3d7b7538c934cf29db791a705631e24_4.geojson",
+                        what = "sp") 
+  save(la_map, file = "la_map.Rdata")
+}else{
+  load("la_map.Rdata")  
+}
+
+# Merge imd domain and cluster data with map data
+map <- tidy(la_map, region = "ctyua17cd") 
+map <- filter(map, !grepl("W", id))
+map <- dplyr::left_join(map, imd_la_subdoms)
+
+fig1b <- ggplot(data = map,
+                aes(y = lat, 
+                    x = long,
+                    group = group,
+                    fill = cluster)) +
+  geom_polygon(col = "black") +
+  theme_minimal() +
+  labs(title = "Geographic distribution of clusters",
+       x = NULL,
+       y = NULL) +
+  scale_fill_brewer(type = "qualitative",
+                    palette = "Set1",
+                    name = "Cluster") 
+
+# Plot figures 1a and 1b together.
+plot_grid(fig1a, fig1b, 
+          nrow = 2,
+          labels = "AUTO")
+
+```
+
+Figure 2 and table 1 show the median sub-domain z-scores scores for each of the clusters. 
+
+```{r cluster characteristics}
+#### Describe cluster characteristics ####
+
+cluster_table <- imd_la_subdoms %>%
+  group_by(cluster) %>%
+  dplyr::summarise(num_las = n(),
+            income = median(income_avg_sc),
+            health = median(health_avg_sc),
+            crime = median(crime_avg_sc),
+            employ = median(employ_avg_sc),
+            education = median(educ_skill_avg_sc),
+            housing = median(housing_avg_sc),
+            environment = median(living_env_avg_sc),
+            IMD_score = median(imd_avg_sc))
+
+kable(cluster_table)
+
+#### Plot cluster IMD subdomain profiles
+ggplot(data = cluster_table %>%
+               gather(key = "variable",
+                      value = "value",
+                      -cluster,
+                      -num_las,
+                      -IMD_score,
+                      factor_key = TRUE),
+             aes(x = variable,
+                 y = value,
+                 fill = factor(cluster))) +
+       geom_bar(stat = "identity") +
+       facet_wrap(~factor(cluster)) +
+       theme_linedraw() +
+       scale_fill_brewer(type = "qualitative",
+                          palette = "Set1") +
+       theme(axis.text.x = element_text(angle = 90),
+             legend.position = c(0.85, 0.0),
+             legend.direction = "horizontal",
+             legend.title.align = 0.0) +
+       guides(fill = guide_legend(ncol = 3,
+                                  byrow = TRUE)) +
+       labs(x = NULL,
+            y = "median sub-domain z-scores",
+            fill = "Cluster") +
+       ggtitle("Figure 2: Cluster median sub-domain scores")
+```
+
+Cluster 1, the least deprived overall, contains 42 local authorities. Average scores for local authorities in this cluster are low on all sub-domains of deprivation apart from barriers to housing, which are around average. Figure 1b shows that these areas are predominantly rural, with some more affluent boroughs of London. 
+
+Cluster 2, comprising 41 local authorities, has average deprivation scores only slightly above average for income, health, and employment, and slightly below average deprivation in education, but high levels of deprivation in crime, housing, and living environment. These areas include a mix of London boroughs as well as some more rural areas, such as Kirklees and Cornwall.
+
+Cluster 3 (30 local authorities) has a similar overall IMD scores to cluster 2 but experiences low levels of housing and environmental deprivation and average crime levels, but high deprivation in income, employment, health, and education and skills. These areas are mainly post-industrial towns concentrated in the North of England.
+
+Cluster 4 is the most deprived overall. Average deprivation scores are high across all sub-domains except housing. This cluster is relatively small, containing only 15 local authorities, mostly deprived towns and cities in the North and Midlands, such as Blackpool, Liverpool, Manchester, and Wolverhampton.
+
+Cluster 5 (24 local authorities), the second least deprived, scores slightly below average across all sub-domains of deprivation, with lower scores in income and environmental deprivation. This cluster includes a mix of rural and urban local authorities, many county councils, such as Northamptonshire and Lincolnshire, which contain both relatively deprived and relatively affluent areas. 
+
+

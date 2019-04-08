@@ -1,6 +1,7 @@
 #### Install packages ####
 # install.packages(c("devtools", "readxl", "ape", "geojsonio",
-#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA"),
+#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
+#                     cowplot),
 #                  dependencies = TRUE)
 
 devtools::install_github("pkimes/sigclust2")
@@ -20,6 +21,8 @@ library(ggalt)            # For mapping
 library(broom)            # For tidying map data
 library(tidyverse)        # For data manipulation
 library(FSA)              # For Dunn's test
+library(knitr)
+library(cowplot)
 
 source("multiplot.R")
 
@@ -105,6 +108,17 @@ fig1a <- plot(shc_result,
 
 imd_la_subdoms <- mutate(imd_la_subdoms,
                          cluster = factor(shcutree(shc_result)))
+
+# Get a dataframe containing list of local authorities in each cluster
+cluster <- unique(imd_la_subdoms$cluster)
+local_authorities <- character(length = length(cluster))
+for(i in cluster){
+  local_authorities[i] <- paste(imd_la_subdoms$area_name[imd_la_subdoms$cluster == i],
+                                collapse = "\n")
+}
+cluster_list <- data.frame(cluster, local_authorities)
+
+kable(cluster_list)
 
 #### Mapping clusters ####
 
@@ -197,7 +211,7 @@ cluster_table <- imd_la_subdoms %>%
             environment = median(living_env_avg_sc),
             IMD_score = median(imd_avg_sc))
 
-## UNFINISHED - Get urban-rural and demographic data
+#### UNFINISHED - Get urban-rural and demographic data ####
 
 # Get urban-rural data
 
@@ -208,7 +222,7 @@ if(!file.exists("urban_rural.xls")){
 
 urban_rural <- read_xls("urban_rural.xls")
 
-## Statistical testing for differences in subdomains
+#### Statistical testing for differences in subdomains ####
 
 # write a function to do testing and plotting of comparisons
 
