@@ -56,8 +56,8 @@ imd_la_subdoms <- dplyr::select(imd_la,
                                 -contains("Rank")) 
 
 # rename variables
-names(imd_la_subdoms) <- c("id",
-                           "area_name",
+names(imd_la_subdoms) <- c("utla_code",
+                           "utla_name",
                            "imd_avg_sc",
                            "income_avg_sc",
                            "employ_avg_sc",
@@ -109,17 +109,6 @@ fig1a <- plot(shc_result,
 imd_la_subdoms <- mutate(imd_la_subdoms,
                          cluster = factor(shcutree(shc_result)))
 
-# Get a dataframe containing list of local authorities in each cluster
-cluster <- unique(imd_la_subdoms$cluster)
-local_authorities <- character(length = length(cluster))
-for(i in cluster){
-  local_authorities[i] <- paste(imd_la_subdoms$area_name[imd_la_subdoms$cluster == i],
-                                collapse = "\n")
-}
-cluster_list <- data.frame(cluster, local_authorities)
-
-kable(cluster_list)
-
 #### Mapping clusters ####
 
 # Get map data
@@ -134,7 +123,8 @@ if(!file.exists("la_map.Rdata")){
 # Merge imd domain and cluster data with map data
 map <- tidy(la_map, region = "ctyua17cd") 
 map <- filter(map, !grepl("W", id))
-map <- dplyr::left_join(map, imd_la_subdoms)
+map <- left_join(map, imd_la_subdoms,
+                 by = c("id" = "utla_code"))
 
 fig1b <- ggplot(data = map,
                 aes(y = lat, 
@@ -156,6 +146,8 @@ fig1b <- ggplot(data = map,
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14))
 
+fig1b
+
 ## Do a hex-map instead
 if(!file.exists("la_hex_map.Rdata")){
   la_hex_map <- geojson_read("https://olihawkins.com/files/media/2018/02/1/hexmap-lad-ew.geojson",
@@ -169,7 +161,75 @@ if(!file.exists("la_hex_map.Rdata")){
 hexmap <- tidy(la_hex_map, region = "c")
 
 # Get lookup from lower-tier to upper-tier
-hexmap <- dplyr::left_join(map, imd_la_subdoms)
+if(!file.exists("lower_tier_to_upper_tier_lookup.csv")){
+  url <- "https://ons.maps.arcgis.com/sharing/rest/content/items/f3af497a0bf34930adc61272ddfa698b/data"
+  download.file(url = url,
+                destfile = "lower_tier_to_upper_tier_lookup.csv",
+                method = "curl")
+}
+
+lookup <- read.csv(file = "lower_tier_to_upper_tier_lookup.csv",
+                   stringsAsFactors = FALSE,
+                   header = TRUE) 
+
+# Fix lookup table so that unitaries aren't merged into regions
+lookup_fixer <- function(region_names){
+  lu <- lookup
+  for(i in region_names){
+    lu$UTLA16CD[lu$UTLA16NM == i] <- lu$LTLA16CD[lu$UTLA16NM == i]
+    lu$UTLA16NM[lu$UTLA16NM == i] <- lu$LTLA16NM[lu$UTLA16NM == i]
+  }
+  return(lu)
+}
+
+regions <- c("Inner London",
+             "Outer London",
+             "Greater Manchester",
+             "West Midlands",
+             "West Yorkshire",
+             "South Yorkshire",
+             "Merseyside",
+             "Tyne and Wear")
+
+lookup <- lookup_fixer(regions)
+
+# Keep only English local authorities & fix variable names
+lookup <- filter(lookup,
+                 grepl("E", UTLA16CD)) %>%
+          select(id = LTLA16CD,
+                 utla_code = UTLA16CD)
+
+# Merge lookup with hexmap
+hexmap <- left_join(hexmap, lookup)
+  
+# Merge IMD data with hexmap
+hexmap <- left_join(hexmap, imd_la_subdoms)
+
+# Keep only English local authorities
+hexmap <- filter(hexmap, grepl("E", id))
+
+# Plot the hexmap
+fig1c <- ggplot(data = hexmap,
+                aes(y = lat, 
+                    x = long,
+                    group = group,
+                    fill = cluster)) +
+  geom_polygon(col = "black") +
+  theme_minimal() +
+  labs(title = "B. Geographic distribution of clusters",
+       x = NULL,
+       y = NULL) +
+  scale_fill_brewer(type = "qualitative",
+                    palette = "Set1",
+                    name = "Cluster") +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 20),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14))
+
+fig1c
 
 # Plot figures 1a and 1b together.
 fig1 <- multiplot(fig1a, fig1b, cols = 2)
