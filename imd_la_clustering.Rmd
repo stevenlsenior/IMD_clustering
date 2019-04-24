@@ -1,8 +1,19 @@
 ---
-title: "Hierarchical clustering of English local authorities by sub-domains of the English Indices of Multiple Deprivation"
-author: "Steven L. Senior, MPH DPhil MFPH"
-output: html_notebook
+title: Hierarchical clustering of English local authorities by sub-domains of the
+  English Indices of Multiple Deprivation
+author: Steven L. Senior, MPH DPhil MFPH, Specialty Registrar in Public Health, Division
+  of Population Health, Health Services Research & Primary Care, University of Manchester,
+  UK.
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
 ---
+
+```{r set up, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
 
 # ABSTRACT  
 
@@ -29,29 +40,22 @@ Hierarchical clustering methods can be used to identify five distinct clusters t
 
 # INTRODUCTION
 
-The English Indices of Multiple Deprivation (IMD) is widely used as a measure of relative deprivation of geographic areas. It underpins many analyses of inequalities in health between places.  
+INTRODUCTION
+The English Indices of Multiple Deprivation (IMD) is a commonly used measure of relative deprivation for geographic areas in England. It is often used for analysing inequalities in health between more and less deprived areas.
 
-An area's overall IMD score is a weighted sum of seven sub-domains of deprivation. Each of the sub-domains is made from a weighted sum of one or more indicators.  
+The IMD provides an overall score of relative deprivation that is used to rank Lower-Super Output Areas (LSOAs, small geographic areas in England, each with a population about approximately 1,500). The overall score is calculated as a weighted sum of seven sub-domains of deprivation. These sub-domains measure deprivation in: income; employment; health and disability; education, training and skills; crime; access to housing and services; and living environment. Each of the sub-domains is made from one or more indicators. Where more than one indicator is used, indicators are combined using weights determined by factor analysis to create the sub-domain score. The weights used to combine the sub-domains into the overall score were determined using a range of methods including previous research that the income and employment domains should be weighted more heavily, as well as empirical research on public preferences and preferences revealed by relative levels of government spending on each domain (Smith et al. 2015). 
 
-While the overall score or rank of an area is useful as a single summary of relative multiple deprivation, similarly ranked areas can be quite different in their sub-domain scores. 
+Summary IMD scores are available for larger geographic areas, such as upper-tier local authorities (the upper-most layer of local government in England). For each upper-tier local authority, a number of different ways of combining the deprivation of its LSOAs are used, including average IMD score, average rank, and the proportion of population living in the 10% most deprived LSOAs (Smith et al. 2015). 
 
-### Example: North East Lincolnshire and South Tyneside:
-Ranked 25th (North East Lincolnshire) and 26th (South Tyneside) most deprived. Both in the second most deprived decile overall.  
+In analyses at local authority level, each local authority is typically ranked according to the average score or average rank of its constituent LSOAs, and local authorities are then grouped into quintiles or deciles. This then forms the basis for estimating inequalities in health outcomes. For example, the Public Health Outcomes Framework, a widely used tool for understanding variations in health between English local authorities, has an option to view health indicators by decile of deprivation (Public Health England 2018).
 
-But in terms of health deprivation they are ranked 66th and 12th most deprived respectively.
-This puts South Tyneside in the most deprived decile for health, but North East Lincolnshire in the fifth most deprived decile for health.  
+While not wholly arbitrary, the method of grouping areas together in quintiles or deciles may group together areas with quite different deprivation profiles. For example, when upper-tier local authorities are ranked by their average IMD scores, North East Lincolnshire and South Tyneside are ranked as the 25th and 26th most deprived local authorities respectively (out of 152 upper-tier local authorities), both in the second most deprived decile. However their scores on the sub-domains are different: in terms of average health and disability deprivation South Tyneside is ranked 12th most deprived (in the most deprived decile), while North East Lincolnshire is ranked 66th most deprived (in the fifth most deprived decile). As a result, the use of a single overarching ranking system may obscure differences in the types of challenges faced by local authorities, and does not make full use of the rich information contained in the full set of sub-domain scores. 
 
-This suggests that (i) grouping areas into quintiles or deciles may group together quite different areas, and (ii) the sub-domains of deprivation offer a richer picture of deprivation.  
+Statistical clustering methods offer a way to use the richer information contained in the IMD sub-domains or indicators, as well as a less arbitrary way to identify groups of similarly deprived geographic areas.[ref] For example,  Bellis et al (2012) used k-means clustering on health outcomes data and found that the cluster with the worst health outcomes was concentrated in the ex-industrial areas of the North of England. One possible drawback of the k-means approach to clustering is that it requires the researcher to specify the number of clusters to be identified in advance. This could lead to an arbitrary choice of numbers of clusters, or to testing a range of numbers of clusters, which may introduce a risk of multiple testing. An alternative approach is hierarchical clustering, which produces a set of nested clusters, allowing the researcher to describe the clustering structure in the data without arbitrarily specifying a number of clusters to be found. Recent advances in statistical methods make it possible to assess at each ‘branch’ in the tree, whether the resulting clusters are likely to have arisen by chance or not, allowing a clustering structure to be determined without the researcher pre-determining how many clusters will be found (Kimes et al. 2017).
 
-### Clustering techniques as an alternative method for grouping areas
+This complements the use of ‘nearest neighbours’ models, such as that produced by the Chartered Institute of Public Finance and Accounting [ref]. This model calculates the Euclidean distance between a given local authority and all other local authorities based on a selection of demographic indicators. This approach is designed to find similar local authorities given an initial local authority, rather than grouping all local authorities based on patterns of deprivation.
 
-Clustering techniques offer a way to find groups of areas that have similar patterns of deprivation. They have been used previously on health outcomes (Bellis et al, 2012).
-Hierarchical clustering identifies groups of entities based on some measure of similarity across scores. These algorithms produce a tree-like breakdown of all areas. This avoids the need for the analyst to pre-specify the number of clusters to be found (as in K-means clustering).
-
-Agglomerative (i.e. bottom-up) clustering starts with all the areas, and merges areas into clusters one at a time, starting with the most similar pair.
-Advances in statistical methods allow significance testing at each branch in the tree to ask whether the observed clusters could have arisen by chance, while controlling for multiple testing (Kimes et al, 2017). This offers a way to identify potentially meaningful clusters, and reduce the chance of identifying spurious clusters.
-
-The aim of this paper is to apply heirarchical agglomerative clustering techniques to domains of deprivation to explore patterns of deprivation among upper-tier local authorities in England. It aims to test the usefulness of unsupervised statistical learning methods in understanding the challenges faced by local authorities.
+The aim of this paper is to apply clustering techniques to domains of deprivation to explore patterns of deprivation among upper-tier local authorities in England. It aims to test the usefulness of unsupervised statistical learning methods in understanding the challenges faced by local authorities.
 
 # METHODS
 
@@ -271,4 +275,10 @@ Cluster 4 is the most deprived overall. Average deprivation scores are high acro
 
 Cluster 5 (24 local authorities), the second least deprived, scores slightly below average across all sub-domains of deprivation, with lower scores in income and environmental deprivation. This cluster includes a mix of rural and urban local authorities, many county councils, such as Northamptonshire and Lincolnshire, which contain both relatively deprived and relatively affluent areas. 
 
+# DISCUSSION
 
+## Key Findings
+
+## Strengths
+
+## Weaknesses

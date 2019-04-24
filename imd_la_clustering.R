@@ -156,6 +156,21 @@ fig1b <- ggplot(data = map,
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14))
 
+## Do a hex-map instead
+if(!file.exists("la_hex_map.Rdata")){
+  la_hex_map <- geojson_read("https://olihawkins.com/files/media/2018/02/1/hexmap-lad-ew.geojson",
+                         what = "sp") 
+  save(la_hex_map, file = "la_hex_map.Rdata")
+}else{
+  load("la_hex_map.Rdata")  
+}
+
+# Tidy hexmap data
+hexmap <- tidy(la_hex_map, region = "c")
+
+# Get lookup from lower-tier to upper-tier
+hexmap <- dplyr::left_join(map, imd_la_subdoms)
+
 # Plot figures 1a and 1b together.
 fig1 <- multiplot(fig1a, fig1b, cols = 2)
 
