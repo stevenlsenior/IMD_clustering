@@ -63,10 +63,10 @@ The aim of this paper is to apply clustering techniques to domains of deprivatio
 
 ```{r installing and loading packages and getting data, message = FALSE, warning = FALSE}
 #### Install packages ####
-#install.packages(c("devtools", "readxl", "ape", "geojsonio",
-#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
-#                   "cowplot"),
-#                 dependencies = TRUE)
+install.packages(c("devtools", "readxl", "ape", "geojsonio",
+                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
+                   "cowplot"),
+                 dependencies = TRUE)
 
 #### load packages ####
 library(sigclust2)        # For clustering

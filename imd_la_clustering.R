@@ -77,12 +77,16 @@ imd_la_subdoms <- imd_la_subdoms[ , c(1:2, 13, 3:12)]
 
 #### Centre and scale variables ####
 
-# Because they're composites anyway, so distance is a bit meaningless
-# Also, using squared Euclidean distances would over/underweight some variables unless scaled
+# Because we're using squared Euclidean distances would over/underweight some variables unless scaled
 
 for(i in 5:ncol(imd_la_subdoms)){
   imd_la_subdoms[,i] <- (imd_la_subdoms[,i] - mean(imd_la_subdoms[,i])) / sd(imd_la_subdoms[,i])
 }
+
+# Drop IDACI and IDAOPI variables
+imd_la_subdoms <- select(imd_la_subdoms,
+                         -IDACI_avg_score,
+                         -IDAOPI_avg_score)
 
 #### Heirarchical clustering with sigclust2 ####
 
@@ -105,7 +109,7 @@ fig1a <- plot(shc_result,
              legend.title = element_text(size = 16),
              legend.text = element_text(size = 14))
 
-
+# Add cluster membership to data
 imd_la_subdoms <- mutate(imd_la_subdoms,
                          cluster = factor(shcutree(shc_result)))
 
@@ -148,7 +152,7 @@ fig1b <- ggplot(data = map,
 
 fig1b
 
-## Do a hex-map instead
+# Do a hex-map instead
 if(!file.exists("la_hex_map.Rdata")){
   la_hex_map <- geojson_read("https://olihawkins.com/files/media/2018/02/1/hexmap-lad-ew.geojson",
                          what = "sp") 
@@ -252,6 +256,7 @@ g1 <- ggplot(data = imd_la_prcomps,
                  y = PC2,
                  colour = factor(imd_la_subdoms$imd_quintile))) +
   geom_point()  +
+  theme_linedraw() +
   theme(legend.position = "bottom") +
   guides(colour=guide_legend(title="IMD quintile",
                              nrow = 2,
@@ -264,13 +269,14 @@ g2 <- ggplot(data = imd_la_prcomps,
   geom_point() +
   scale_colour_brewer(type = "qualitative",
                     palette = "Set1") +
+  theme_linedraw() +
   theme(legend.position = "bottom") +
   guides(colour=guide_legend(title="Cluster",
                              nrow = 2,
                              byrow = TRUE))
 
 
-multiplot(g1, g2, cols = 2)
+plot_grid(g1, g2, ncol = 2, labels = "AUTO")
 
 #### Describe cluster characteristics ####
 
@@ -334,7 +340,7 @@ subdom_test <- function(v, m = "bonferroni"){
   
 }
 
-# plot and test comparisons
+# test comparisons
 
 subdom_test("imd_avg_sc")
 subdom_test("income")
@@ -345,13 +351,16 @@ subdom_test("crime")
 subdom_test("housing")
 subdom_test("living")
 
+#### Plotting subdomain scores ####
+
 g4 <- ggplot(data = cluster_table %>%
                gather(key = "variable",
                       value = "value",
                       -cluster,
                       -num_las,
                       -IMD_score,
-                      factor_key = TRUE),
+                      factor_key = TRUE) %>%
+               mutate(cluster = paste0("Cluster ", cluster)),
              aes(x = variable,
                  y = value,
                  fill = factor(cluster))) +
@@ -360,17 +369,44 @@ g4 <- ggplot(data = cluster_table %>%
        theme_minimal() +
        scale_fill_brewer(type = "qualitative",
                           palette = "Set1") +
-       theme(axis.text.x = element_text(angle = 90),
-             legend.position = c(0.85, 0.0),
-             legend.direction = "horizontal",
-             legend.title.align = 0.0) +
-       guides(fill = guide_legend(ncol = 3,
-                                  byrow = TRUE)) +
+       theme(axis.text.x = element_text(angle = 90)) +
+       guides(fill = FALSE) +
        labs(x = NULL,
-            y = "median sub-domain z-scores",
-            fill = "Cluster") +
+            y = "median sub-domain z-scores") +
        ggtitle("Figure 2: Cluster median sub-domain scores")
+
+g4
   
+# Use boxplots
+
+g5 <- ggplot(data = imd_la_subdoms %>%
+               select(-imd_avg_sc, -imd_quintile) %>%
+               gather(key = "variable",
+                      value = "value",
+                      -cluster,
+                      -utla_code,
+                      -utla_name,
+                      factor_key = TRUE) %>%
+               mutate(cluster = paste0("Cluster ", cluster)),
+             aes(x = variable,
+                 y = value,
+                 fill = factor(cluster))) +
+  geom_boxplot() +
+  facet_wrap(~factor(cluster)) +
+  stat_identity(yintercept=0, 
+                lty = "dashed",
+                geom='hline', 
+                inherit.aes=TRUE) +
+  theme_minimal() +
+  scale_fill_brewer(type = "qualitative",
+                    palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  guides(fill = FALSE) +
+  labs(x = NULL,
+       y = "sub-domain z-scores") +
+  ggtitle("Figure 2: Cluster median sub-domain scores")
+
+g5
 
 #### Images for PHE e-poster
 phe1 <- plot(shc_result,
