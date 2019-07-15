@@ -21,10 +21,9 @@ library(ggalt)            # For mapping
 library(broom)            # For tidying map data
 library(tidyverse)        # For data manipulation
 library(FSA)              # For Dunn's test
-library(knitr)
-library(cowplot)
+library(knitr)            # For tables in rmarkdown
+library(cowplot)          # For doing good plots
 
-source("multiplot.R")
 
 #### Download files ####
 
@@ -58,20 +57,20 @@ imd_la_subdoms <- dplyr::select(imd_la,
 # rename variables
 names(imd_la_subdoms) <- c("utla_code",
                            "utla_name",
-                           "imd_avg_sc",
-                           "income_avg_sc",
-                           "employ_avg_sc",
-                           "educ_skill_avg_sc",
-                           "health_avg_sc",
-                           "crime_avg_sc",
-                           "housing_avg_sc",
-                           "living_env_avg_sc",
-                           "IDACI_avg_score",
-                           "IDAOPI_avg_score")
+                           "imd",
+                           "income",
+                           "employment",
+                           "educ_skill",
+                           "health",
+                           "crime",
+                           "housing",
+                           "living_env",
+                           "IDACI",
+                           "IDAOPI")
 
 # Create IMD quintiles variable
 imd_la_subdoms <- mutate(imd_la_subdoms,
-                         imd_quintile = ntile(imd_avg_sc, n = 5))
+                         imd_quintile = ntile(imd, n = 5))
 
 imd_la_subdoms <- imd_la_subdoms[ , c(1:2, 13, 3:12)]
 
@@ -85,8 +84,8 @@ for(i in 5:ncol(imd_la_subdoms)){
 
 # Drop IDACI and IDAOPI variables
 imd_la_subdoms <- select(imd_la_subdoms,
-                         -IDACI_avg_score,
-                         -IDAOPI_avg_score)
+                         -IDACI,
+                         -IDAOPI)
 
 #### Heirarchical clustering with sigclust2 ####
 
@@ -96,10 +95,16 @@ shc_result <- shc(as.matrix(imd_la_subdoms[,5:11]),
                   alpha = 0.001,
                   n_sim = 500)
 
+shc_result$hc_dat$labels <- imd_la_subdoms$utla_name
+
+# Add cluster membership to data
+imd_la_subdoms <- mutate(imd_la_subdoms,
+                         cluster = factor(shcutree(shc_result)))
+
 # Make figure 1 using plot.shc()
 fig1a <- plot(shc_result,
               use_labs = FALSE,
-              groups = shcutree(shc_result)) + 
+              groups = imd_la_subdoms$cluster) + 
        theme_minimal() +
        scale_fill_brewer(type = "qualitative",
                          palette = "Set1",
@@ -109,9 +114,7 @@ fig1a <- plot(shc_result,
              legend.title = element_text(size = 16),
              legend.text = element_text(size = 14))
 
-# Add cluster membership to data
-imd_la_subdoms <- mutate(imd_la_subdoms,
-                         cluster = factor(shcutree(shc_result)))
+fig1a
 
 #### Mapping clusters ####
 
@@ -148,9 +151,57 @@ fig1b <- ggplot(data = map,
         axis.ticks = element_blank(),
         plot.title = element_text(size = 20),
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14))
+        legend.title = element_text(size = 12))
 
 fig1b
+
+# Make an insert of London boroughs
+# Get list of London Boroughs
+
+if(!file.exists("london_boroughs.csv")){
+  download.file(url = "https://data.london.gov.uk/download/london-borough-profiles/c1693b82-68b1-44ee-beb2-3decf17dc1f8/london-borough-profiles.csv",
+              destfile = "london_boroughs.csv")
+}
+
+london <- read.csv("london_boroughs.csv",
+                   header = TRUE,
+                   stringsAsFactors = FALSE,
+                   fileEncoding="latin1")
+
+# Create map object for only London boroughs
+map_london <- filter(map, id %in% london$Code)
+
+# Map London boroughs only
+fig1b_insert <- ggplot(data = map_london,
+                aes(y = lat, 
+                    x = long,
+                    group = group,
+                    fill = cluster)) +
+  geom_polygon(col = "black") +
+  theme_minimal() +
+  labs(title = "London",
+       x = NULL,
+       y = NULL) +
+  scale_fill_brewer(type = "qualitative",
+                    palette = "Set1",
+                    name = "Cluster") +
+  guides(fill = FALSE) +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 12,
+                                  hjust = 0.5))
+
+fig1b_insert
+
+ggdraw() +
+  draw_plot(fig1b) +
+  draw_plot(fig1b_insert,
+            height = 0.2,
+            width = 0.2,
+            x = 0.70,
+            y = 0.55)
+
 
 # Do a hex-map instead
 if(!file.exists("la_hex_map.Rdata")){
@@ -282,15 +333,15 @@ plot_grid(g1, g2, ncol = 2, labels = "AUTO")
 
 cluster_table <- imd_la_subdoms %>%
   group_by(cluster) %>%
-  dplyr::summarise(num_las = n(),
-            income = median(income_avg_sc),
-            health = median(health_avg_sc),
-            crime = median(crime_avg_sc),
-            employ = median(employ_avg_sc),
-            education = median(educ_skill_avg_sc),
-            housing = median(housing_avg_sc),
-            environment = median(living_env_avg_sc),
-            IMD_score = median(imd_avg_sc))
+  summarise(num_las = n(),
+            income = median(income),
+            health = median(health),
+            crime = median(crime),
+            employ = median(employment),
+            education = median(education_skill),
+            housing = median(housing),
+            environment = median(living_env),
+            IMD_score = median(imd))
 
 #### UNFINISHED - Get urban-rural and demographic data ####
 
@@ -342,7 +393,7 @@ subdom_test <- function(v, m = "bonferroni"){
 
 # test comparisons
 
-subdom_test("imd_avg_sc")
+subdom_test("imd")
 subdom_test("income")
 subdom_test("employ")
 subdom_test("educ")
@@ -378,16 +429,24 @@ g4 <- ggplot(data = cluster_table %>%
 g4
   
 # Use boxplots
-
 g5 <- ggplot(data = imd_la_subdoms %>%
-               select(-imd_avg_sc, -imd_quintile) %>%
+               select(-imd, -imd_quintile) %>%
                gather(key = "variable",
                       value = "value",
                       -cluster,
                       -utla_code,
                       -utla_name,
                       factor_key = TRUE) %>%
-               mutate(cluster = paste0("Cluster ", cluster)),
+               mutate(cluster = paste0("Cluster ", cluster),
+                      variable = factor(variable,
+                                        levels = c("income",
+                                                   "employment",
+                                                   "educ_skill",
+                                                   "health",
+                                                   "crime",
+                                                   "housing",
+                                                   "living_env"),
+                                        ordered = TRUE)),
              aes(x = variable,
                  y = value,
                  fill = factor(cluster))) +
