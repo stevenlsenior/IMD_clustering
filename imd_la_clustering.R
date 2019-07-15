@@ -1,10 +1,11 @@
 #### Install packages ####
 # install.packages(c("devtools", "readxl", "ape", "geojsonio",
 #                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
-#                     cowplot),
+#                     "cowplot", "impute", "preprocessCore", "Go.db", "AnnotationDbi"),
 #                  dependencies = TRUE)
 
-devtools::install_github("pkimes/sigclust2")
+BiocManager::install("pkimes/sigclust2")
+devtools::install_github("nolanlab/Rclusterpp")
 devtools::install_version("rgdal", 
                           version = "1.3-9",
                           repos = "http://cran.us.r-project.org")
@@ -151,7 +152,8 @@ fig1b <- ggplot(data = map,
         axis.ticks = element_blank(),
         plot.title = element_text(size = 20),
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 12))
+        legend.title = element_text(size = 12),
+        legend.position = "right")
 
 fig1b
 
@@ -190,17 +192,18 @@ fig1b_insert <- ggplot(data = map_london,
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         plot.title = element_text(size = 12,
-                                  hjust = 0.5))
+                                  hjust = 0.5)) +
+  panel_border(colour = "black")
 
 fig1b_insert
 
-ggdraw() +
-  draw_plot(fig1b) +
-  draw_plot(fig1b_insert,
-            height = 0.2,
-            width = 0.2,
-            x = 0.70,
-            y = 0.55)
+fig1b2 <- ggdraw() +
+         draw_plot(fig1b) +
+         draw_plot(fig1b_insert,
+                   height = 0.2,
+                   width = 0.2,
+                   x = 0.775,
+                   y = 0.7)
 
 
 # Do a hex-map instead
@@ -287,12 +290,12 @@ fig1c <- ggplot(data = hexmap,
 fig1c
 
 # Plot figures 1a and 1b together.
-fig1 <- multiplot(fig1a, fig1b, cols = 2)
+fig1 <- plot_grid(fig1a, fig1b2, ncol = 2)
 
 png(file = "figure1.png",
     width = 960,
     height = 480)
-multiplot(fig1a, fig1b, cols = 2)
+fig1
 dev.off()
 
 # Lets see how those clusters compare with the earlier plot of IMD quintiles & principle components
@@ -457,6 +460,14 @@ g5 <- ggplot(data = imd_la_subdoms %>%
                 geom='hline', 
                 inherit.aes=TRUE) +
   theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(size = 20),
+        strip.text.x = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        axis.text = element_text(size = 14)
+        ) +
   scale_fill_brewer(type = "qualitative",
                     palette = "Set1") +
   theme(axis.text.x = element_text(angle = 90)) +
@@ -466,6 +477,12 @@ g5 <- ggplot(data = imd_la_subdoms %>%
   ggtitle("Figure 2: Cluster median sub-domain scores")
 
 g5
+
+png(file = "figure2.png",
+    width = 900,
+    height = 700)
+g5
+dev.off()
 
 #### Images for PHE e-poster
 phe1 <- plot(shc_result,
