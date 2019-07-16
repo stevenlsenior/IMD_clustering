@@ -1,7 +1,7 @@
 #### Install packages ####
 # install.packages(c("devtools", "readxl", "ape", "geojsonio",
 #                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
-#                     "cowplot", "impute", "preprocessCore", "Go.db", "AnnotationDbi"),
+#                     "cowplot", "impute", "preprocessCore", "Go.db", "AnnotationDbi", "fingertipsR"),
 #                  dependencies = TRUE)
 
 BiocManager::install("pkimes/sigclust2")
@@ -24,6 +24,7 @@ library(tidyverse)        # For data manipulation
 library(FSA)              # For Dunn's test
 library(knitr)            # For tables in rmarkdown
 library(cowplot)          # For doing good plots
+library(fingertipsR)      # For getting data from Fingertips
 
 
 #### Download files ####
@@ -285,10 +286,9 @@ png(file = "figure2.png",
 g5
 dev.off()
 
-#### UNFINISHED - Get urban-rural and demographic data ####
+#### Get urban-rural data and merge with main dataset ####
 
 # Get urban-rural data
-
 if(!file.exists("urban_rural.xls")){
   download.file(url = "https://www.ons.gov.uk/file?uri=/methodology/geography/geographicalproducts/ruralurbanclassifications/2001ruralurbanclassification/ruralurbanlocalauthoritylaclassificationengland/laclassificationdatasetpost0409tcm77188156.xls",
                 destfile = "urban_rural.xls")
@@ -329,12 +329,6 @@ regions <- c("Inner London",
 
 lookup <- lookup_fixer(regions)
 
-# Keep only English local authorities & fix variable names
-lookup <- filter(lookup,
-                 grepl("E", UTLA16CD)) %>%
-  select(id = LTLA16CD,
-         utla_code = UTLA16CD)
-
 # Need to match on names - fix names that don't match
 urban_rural <- urban_rural %>%
                mutate(Name = recode(Name,
@@ -352,11 +346,50 @@ urban_rural <- merge(urban_rural, lookup,
                      all.x = FALSE)
 
 # Summarise urban-rural data for upper tier local authorities
-urban_rural_upper <- urban_rural %>%
-                     group_by(UTLA16CD, UTLA16NM) %>%
-                     summarise(total_pop = sum(`Total Population1`),
-                               rural_pop = sum(`Total Population1` * `Rural% (including Large Market Town population)2` / 100)) %>%
-                     mutate(rural_percent = rural_pop * 100 / total_pop)
+urban_rural <- urban_rural %>%
+               group_by(UTLA16CD, UTLA16NM) %>%
+               summarise(total_pop = sum(`Total Population1`),
+                         rural_pop = sum(`Total Population1` * `Rural% (including Large Market Town population)2` / 100)) %>%
+               mutate(percent_rural = rural_pop * 100 / total_pop) %>%
+               select(utla_code = UTLA16CD,
+                      utla_name = UTLA16NM,
+                      percent_rural)
+
+imd_la_subdoms <- merge(imd_la_subdoms, urban_rural)
+
+rm(urban_rural)
+
+#### Get demographic data and merge with main dataset ####
+
+# Get demographic data from fingertips
+inds <- indicators() %>%
+        filter(grepl("Supporting information", IndicatorName))
+
+demog <- fingertips_data(IndicatorID = unique(inds$IndicatorID)) %>%
+         filter(AreaType == "County & UA",
+                Timeperiod == 2016,
+                Sex == "Persons") %>%
+         select(utla_code = AreaCode,
+                ind = IndicatorName,
+                value = Value) %>%
+         spread(key = ind,
+                value = value) %>%
+         rename(percent_65plus = 2,
+                percent_under18 = 3,
+                percent_ethnic = 4)
+
+pop <- fingertips_data(IndicatorID = inds$IndicatorID[1]) %>%
+       filter(AreaType == "County & UA",
+              Timeperiod == 2016,
+              Sex == "Persons") %>%
+      select(utla_code = AreaCode,
+             total_pop = Denominator)
+
+demog <- merge(demog, pop)
+
+imd_la_subdoms <- merge(imd_la_subdoms, demog)
+
+rm(demog, pop)
 
 #### Testing for significant differences in cluster characteristics ####
 
