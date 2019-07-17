@@ -111,12 +111,11 @@ fig1a <- plot(shc_result,
        scale_fill_brewer(type = "qualitative",
                          palette = "Set1",
                          name = "Cluster") +
-       labs(title = "A. Clustering dendrogram") +
-       theme(plot.title = element_text(size = 20),
-             legend.title = element_text(size = 16),
-             legend.text = element_text(size = 14))
-
-fig1a
+       labs(title = "Clustering dendrogram") +
+       #theme(plot.title = element_text(size = 20),
+       #      legend.title = element_text(size = 16),
+       #      legend.text = element_text(size = 14)) + 
+       NULL
 
 #### Mapping clusters ####
 
@@ -142,7 +141,7 @@ fig1b <- ggplot(data = map,
                     fill = cluster)) +
   geom_polygon(col = "black") +
   theme_minimal() +
-  labs(title = "B. Geographic distribution of clusters",
+  labs(title = "Map of clusters",
        x = NULL,
        y = NULL) +
   scale_fill_brewer(type = "qualitative",
@@ -151,12 +150,11 @@ fig1b <- ggplot(data = map,
   theme(panel.grid = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
-        plot.title = element_text(size = 20),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.2),
+        #plot.title = element_text(size = 20),
+        #legend.text = element_text(size = 12),
+        #legend.title = element_text(size = 12),
         legend.position = "right")
-
-fig1b
 
 # Make an insert of London boroughs
 # Get list of London Boroughs
@@ -192,44 +190,63 @@ fig1b_insert <- ggplot(data = map_london,
   theme(panel.grid = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
-        plot.title = element_text(size = 12,
-                                  hjust = 0.5)) +
+        plot.title = element_text(hjust = 0.5)) +
   panel_border(colour = "black")
 
-fig1b_insert
-
 fig1b2 <- ggdraw() +
-         draw_plot(fig1b) +
-         draw_plot(fig1b_insert,
-                   height = 0.2,
-                   width = 0.2,
-                   x = 0.775,
-                   y = 0.7)
+          draw_plot(fig1b) +
+          draw_plot(fig1b_insert,
+                    height = 0.2,
+                    width = 0.2,
+                    x = 0.7,
+                    y = 0.7)
 
 # Plot figures 1a and 1b together.
-fig1 <- plot_grid(fig1a, fig1b2, ncol = 2)
+fig1 <- plot_grid(fig1a, fig1b2, 
+                  labels = "AUTO",
+                  ncol = 2)
 
-png(file = "figure1.png",
-    width = 960,
-    height = 480)
-fig1
-dev.off()
+# Add a shared title and caption
+title_gg <- ggplot() + 
+            labs(title = "Figure 1: Heirarchical clustering of local authorities by subdomains of deprivation") +
+            theme_minimal() +
+            theme(plot.title = element_text(face = "bold")) 
 
+cap_gg <- ggplot() +
+  labs(caption = "A: Clustering dendrogram showing the clustering structure. Nodes at which clustering was statistically significant are indicated by red branches. \nP-values for significant nodes are presented. Five statistically significant clusters are identified, indicated by the coloured bars at the bottom.\nFWER - family-wise error rate.\n
+B: Map showing the geographic distribution of the significant clusters identified. Cluster colours correspond to those in panel A.
+") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        plot.caption = element_text(hjust = 0))   
 
+fig1 <- plot_grid(title_gg, 
+                  fig1, 
+                  cap_gg,
+                  ncol = 1, 
+                  rel_heights = c(0.15, 1, 0.3))
+
+ggsave(filename = "figure1.jpg",
+       plot = fig1,
+       width = 24,
+       height = 14,
+       units = "cm",
+       device = "jpeg",
+       quality = 100)
 
 #### Describe cluster characteristics ####
 
 cluster_table <- imd_la_subdoms %>%
   group_by(cluster) %>%
   summarise(num_las = n(),
+            IMD_score = median(imd),
             income = median(income),
             health = median(health),
             crime = median(crime),
             employ = median(employment),
-            education = median(education_skill),
+            education = median(educ_skill),
             housing = median(housing),
-            environment = median(living_env),
-            IMD_score = median(imd))
+            environment = median(living_env))
 
 #### Plotting subdomain scores ####
 # Use boxplots
@@ -263,28 +280,29 @@ g5 <- ggplot(data = imd_la_subdoms %>%
   theme_minimal() +
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank(),
-        plot.title = element_text(size = 20),
-        strip.text.x = element_text(size = 14),
-        legend.text = element_text(size = 14),
-        legend.title = element_text(size = 14),
-        axis.text.x = element_text(size = 14),
-        axis.title.y = element_text(size = 14)
+        #plot.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 14),
+        #legend.text = element_text(size = 14),
+        #legend.title = element_text(size = 14),
+        #axis.text.x = element_text(size = 14),
+        axis.title.y = element_text(face = "bold")
   ) +
   scale_fill_brewer(type = "qualitative",
                     palette = "Set1") +
   theme(axis.text.x = element_text(angle = 90)) +
   guides(fill = FALSE) +
   labs(x = NULL,
-       y = "sub-domain z-scores") +
-  ggtitle("Figure 2: Cluster median sub-domain scores")
+       y = "sub-domain z-scores",
+       title = "Figure 2: Cluster deprivation profiles",
+       subtitle = "Median IMD subdomain scores by cluster")
 
-g5
-
-png(file = "figure2.png",
-    width = 900,
-    height = 700)
-g5
-dev.off()
+ggsave(filename = "figure2.jpg",
+       plot = g5,
+       width = 24,
+       height = 12,
+       units = "cm",
+       device = "jpeg",
+       quality = 100)
 
 #### Get urban-rural data and merge with main dataset ####
 
@@ -357,6 +375,7 @@ urban_rural <- urban_rural %>%
 
 imd_la_subdoms <- merge(imd_la_subdoms, urban_rural)
 
+# Remove temporary objects
 rm(urban_rural)
 
 #### Get demographic data and merge with main dataset ####
@@ -365,6 +384,7 @@ rm(urban_rural)
 inds <- indicators() %>%
         filter(grepl("Supporting information", IndicatorName))
 
+# Percentages of under 18s, over 65s, and ethnic minorities
 demog <- fingertips_data(IndicatorID = unique(inds$IndicatorID)) %>%
          filter(AreaType == "County & UA",
                 Timeperiod == 2016,
@@ -378,18 +398,56 @@ demog <- fingertips_data(IndicatorID = unique(inds$IndicatorID)) %>%
                 percent_under18 = 3,
                 percent_ethnic = 4)
 
+# Total population numbers
 pop <- fingertips_data(IndicatorID = inds$IndicatorID[1]) %>%
        filter(AreaType == "County & UA",
               Timeperiod == 2016,
               Sex == "Persons") %>%
-      select(utla_code = AreaCode,
-             total_pop = Denominator)
+       select(utla_code = AreaCode,
+              total_pop = Denominator) %>%
+       mutate(total_pop = total_pop / 100000)
 
+# Merge percentages and total population data together
 demog <- merge(demog, pop)
 
+# Merge demographic data with main dataset
 imd_la_subdoms <- merge(imd_la_subdoms, demog)
 
-rm(demog, pop)
+# Remove temporary objects
+rm(demog, pop, inds)
+
+#### Get geographic size data from ONS ####
+
+# Get geographic size of upper tier local authorities
+if(!file.exists("la_sizes.xls")){
+  url <- "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/2011censuspopulationestimatesbyfiveyearagebandsandhouseholdestimatesforlocalauthoritiesintheunitedkingdom/r12ukrttablep04ukv2_tcm77-304141.xls"
+  download.file(url = url,
+                destfile = "la_sizes.xls",
+                method = "curl")
+}
+
+utla_sizes <- read_excel("la_sizes.xls",
+                         sheet = 2,
+                         skip = 12,
+                         trim_ws = TRUE)
+
+# Fix codes for Gateshead and Northumberland
+utla_sizes$`Area code 2`[utla_sizes$...4 == "Gateshead"] <- "E08000037"
+utla_sizes$`Area code 2`[utla_sizes$...3 == "Northumberland UA 5"] <- "E06000057"
+
+# Select upper tier local authorities
+utla_sizes <- utla_sizes %>%
+              select(utla_code = 1,
+                     area = Area) %>%
+              filter(!is.na(utla_code),
+                     utla_code %in% imd_la_subdoms$utla_code) %>%
+              mutate(area = as.numeric(area))
+
+# Merge with main data set
+imd_la_subdoms <- merge(imd_la_subdoms, utla_sizes)
+
+# Remove temporary objects
+rm(utla_sizes)
 
 #### Testing for significant differences in cluster characteristics ####
 
@@ -400,7 +458,7 @@ subdom_test <- function(v, m = "bonferroni"){
        select(cluster, var = contains(v))
   
   kt <- kruskal.test(var ~ cluster,
-                    data = d)
+                     data = d)
   
   dt <- dunnTest(var ~ cluster,
                  data = d,
@@ -413,16 +471,99 @@ subdom_test <- function(v, m = "bonferroni"){
        geom_boxplot() +
        labs(title = "",
             x = "cluster",
-            y = paste0(v, " (z-score)")) +
+            y = v) +
        theme_minimal() +
        scale_fill_brewer(type = "qualitative",
                            palette = "Set1") +
        guides(fill = FALSE)
-  
-  print(kt)
-  print(dt)
-  print(g)
-  
+
   return(list(kt, dt, g))
   
 }
+
+# List of variables to compare
+vars <- c("area",
+          "total_pop",
+          "percent_under18",
+          "percent_65plus",
+          "percent_ethnic",
+          "percent_rural")
+
+# Empty vectors for stats and p-values from Kruskal-Wallis tests
+kt_stat <- numeric()
+kt_pval <- numeric()
+
+for(i in 1: length(vars)){
+  t <- subdom_test(vars[i])
+  kt_stat[i] <- t[[1]]$statistic
+  kt_pval[i] <- t[[1]]$p.value
+  g <- t[[3]]
+  assign(paste0("g_", vars[i]), g)
+}
+
+# Table of comparisons
+kt_table <- tibble(vars, kt_stat, kt_pval)
+
+#### Figure 3 ####
+
+# Add appropriate axis labels and titles
+g_area <- g_area + 
+          labs(title = "Geographic size",
+               y = "area (hectares)")
+
+g_total_pop <- g_total_pop + 
+               labs(title = "Population size",
+                    y = "population (100,000s)")
+
+g_percent_under18 <- g_percent_under18 + 
+  labs(title = "Population aged under 18",
+       y = "%")
+
+g_percent_65plus <- g_percent_65plus + 
+  labs(title = "Population aged 65 and over",
+       y = "%")       
+
+g_percent_ethnic <- g_percent_ethnic + 
+  labs(title = "Ethnic diversity",
+       y = "%")
+
+g_percent_rural <- g_percent_rural + 
+  labs(title = "Population in rural areas",
+       y = "%")
+
+# Plot comparisons
+fig3 <- plot_grid(g_area, 
+                  g_total_pop, 
+                  g_percent_under18,
+                  g_percent_65plus,
+                  g_percent_ethnic,
+                  g_percent_rural,
+                  cols = 3,
+                  labels = "AUTO")
+
+# Add title and caption
+
+title_gg3 <- ggplot() + 
+  labs(title = "Figure 3: Cluster characteristics") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold")) 
+
+cap_gg3 <- ggplot() +
+  labs(caption = "Characterisation of clusters according to geographic size and demographic characteristics.\nA: Geographic size in hectares (source: ONS).\nB: Population size (100,000s) (source: PHE; 2016 data).\nC: Percentage of population aged under 18 years (source: PHE; 2016 data).\nD: Percentage of population aged 65 years and older (source: PHE; 2016 data).\nE: Percentage of population from black and minority ethnic backgrounds (source: PHE; 2016 data).\nF: Percentage of population living in rural areas (including large market towns; source: ONS; 2011 data)") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        plot.caption = element_text(hjust = 0)) 
+
+fig3 <- plot_grid(title_gg3, 
+                          fig3, 
+                          cap_gg3,
+                          ncol = 1, 
+                          rel_heights = c(0.1, 1, 0.25))
+
+ggsave(filename = "figure3.jpg",
+       plot = fig3,
+       width = 24,
+       height = 14,
+       units = "cm",
+       device = "jpeg",
+       quality = 100)
