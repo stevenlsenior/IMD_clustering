@@ -234,19 +234,69 @@ ggsave(filename = "figure1.jpg",
        device = "jpeg",
        quality = 100)
 
+#### Comparing clusters and IMD quintiles ####
+
+# Create table of clusters vs IMD quintile
+table2 <- ftable(imd_la_subdoms$cluster,
+                 imd_la_subdoms$imd_quintile) %>%
+          addmargins()
+
+colnames(table2) <- c(as.character(1:5), "total")
+rownames(table2) <- c(as.character(1:5), "total")
+
+# Save table
+write.csv(table2,
+          file = "cluster_vs_imd_quntiles.csv",
+          row.names = TRUE)
+
 #### Describe cluster characteristics ####
 
 cluster_table <- imd_la_subdoms %>%
   group_by(cluster) %>%
-  summarise(num_las = n(),
-            IMD_score = median(imd),
-            income = median(income),
-            health = median(health),
-            crime = median(crime),
-            employ = median(employment),
-            education = median(educ_skill),
-            housing = median(housing),
-            environment = median(living_env))
+  summarise(n = n(),
+            IMD_score_med = median(imd),
+            IMD_score_iqr = IQR(imd),
+            income_med = median(income),
+            income_iqr = IQR(income),
+            health_med = median(health),
+            health_iqr = IQR(health),
+            crime_med = median(crime),
+            crime_iqr = IQR(crime),
+            employment_med = median(employment),
+            employment_iqr = IQR(employment),
+            education_med = median(educ_skill),
+            education_iqr = IQR(educ_skill),
+            housing_med = median(housing),
+            housing_iqr = IQR(housing),
+            environment_med = median(living_env),
+            environment_iqr = IQR(living_env)) %>%
+            mutate_if(is.double,
+                      round,
+                      digits = 2)
+
+# table for paper
+table1 <- cluster_table %>%
+          mutate(IMD_score = paste0(IMD_score_med, " (", IMD_score_iqr, ")"),
+                 income = paste0(income_med, " (", income_iqr, ")"),
+                 employment = paste0(employment_med, " (", employment_iqr, ")"),
+                 education = paste0(education_med, " (", education_iqr, ")"),
+                 health = paste0(health_med, " (", health_iqr, ")"),
+                 housing = paste0(housing_med, " (", housing_iqr, ")"),
+                 environment = paste0(environment_med, " (", environment_iqr, ")")
+                 ) %>%
+          select(cluster,
+                 n,
+                 IMD_score,
+                 income,
+                 employment,
+                 education,
+                 health,
+                 housing,
+                 environment)
+
+write.csv(table1,
+          file = "cluster_subdomain_scores.csv",
+          row.names = FALSE)
 
 #### Plotting subdomain scores ####
 # Use boxplots
@@ -501,8 +551,30 @@ for(i in 1: length(vars)){
   assign(paste0("g_", vars[i]), g)
 }
 
+df <- rep(4, times = length(kt_stat))
+varnames <- c("Area",
+              "Total population",
+              "% aged under 18",
+              "% aged 65 and over",
+              "% ethnic minority",
+              "% living in rural areas")
+
 # Table of comparisons
-kt_table <- tibble(vars, kt_stat, kt_pval)
+kt_table <- tibble(varnames, kt_stat, df, kt_pval)
+
+# Table 3 for paper
+table3 <- kt_table %>%
+          mutate(kt_stat = round(kt_stat, digits = 2)) %>%
+          mutate(kt_pval = ifelse(kt_pval < 0.001, 0, kt_pval)) %>%
+          mutate(kt_pval = round(kt_pval, digits = 3)) %>%
+          mutate(kt_pval = ifelse(kt_pval == 0, "< 0.001", kt_pval)) %>%
+          rename(Variable = varnames,
+                 `Chi-squared` = kt_stat,
+                 `p-value` = kt_pval)  
+
+write.csv(table3,
+          file = "KW_test_table.csv",
+          row.names = FALSE)
 
 #### Figure 3 ####
 
