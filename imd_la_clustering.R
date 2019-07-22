@@ -103,7 +103,7 @@ shc_result$hc_dat$labels <- imd_la_subdoms$utla_name
 imd_la_subdoms <- mutate(imd_la_subdoms,
                          cluster = factor(shcutree(shc_result)))
 
-# Make figure 1 using plot.shc()
+#### Figure 1a: Dendrogram ####
 fig1a <- plot(shc_result,
               use_labs = FALSE,
               groups = imd_la_subdoms$cluster) + 
@@ -117,7 +117,7 @@ fig1a <- plot(shc_result,
        #      legend.text = element_text(size = 14)) + 
        NULL
 
-#### Mapping clusters ####
+#### Figure 1b: Mapping clusters ####
 
 # Get map data
 if(!file.exists("la_map.Rdata")){
@@ -234,7 +234,7 @@ ggsave(filename = "figure1.jpg",
        device = "jpeg",
        quality = 100)
 
-#### Comparing clusters and IMD quintiles ####
+#### Table 2: Comparing clusters and IMD quintiles ####
 
 # Create table of clusters vs IMD quintile
 table2 <- ftable(imd_la_subdoms$cluster,
@@ -246,10 +246,10 @@ rownames(table2) <- c(as.character(1:5), "total")
 
 # Save table
 write.csv(table2,
-          file = "cluster_vs_imd_quntiles.csv",
+          file = "table2.csv",
           row.names = TRUE)
 
-#### Describe cluster characteristics ####
+#### Table 1: Describe cluster characteristics ####
 
 cluster_table <- imd_la_subdoms %>%
   group_by(cluster) %>%
@@ -297,10 +297,10 @@ table1 <- cluster_table %>%
                  environment)
 
 write.csv(table1,
-          file = "cluster_subdomain_scores.csv",
+          file = "table1.csv",
           row.names = FALSE)
 
-#### Plotting subdomain scores ####
+#### Figure 2: Plotting subdomain scores ####
 # Use boxplots
 g5 <- ggplot(data = imd_la_subdoms %>%
                select(-imd, -imd_quintile) %>%
@@ -487,13 +487,13 @@ utla_sizes <- read_excel("la_sizes.xls",
 utla_sizes$`Area code 2`[utla_sizes$...4 == "Gateshead"] <- "E08000037"
 utla_sizes$`Area code 2`[utla_sizes$...3 == "Northumberland UA 5"] <- "E06000057"
 
-# Select upper tier local authorities
+# Select upper tier local authorities and scale numeric to 10,000s of HA
 utla_sizes <- utla_sizes %>%
               select(utla_code = 1,
                      area = Area) %>%
               filter(!is.na(utla_code),
                      utla_code %in% imd_la_subdoms$utla_code) %>%
-              mutate(area = as.numeric(area))
+              mutate(area = as.numeric(area)/10000)
 
 # Merge with main data set
 imd_la_subdoms <- merge(imd_la_subdoms, utla_sizes)
@@ -564,26 +564,75 @@ varnames <- c("Area",
 # Table of comparisons
 kt_table <- tibble(varnames, kt_stat, df, kt_pval)
 
-# Table 3 for paper
+#### Table 3: cluster characteristics ####
 table3 <- kt_table %>%
           mutate(kt_stat = round(kt_stat, digits = 2)) %>%
           mutate(kt_pval = ifelse(kt_pval < 0.001, 0, kt_pval)) %>%
           mutate(kt_pval = round(kt_pval, digits = 3)) %>%
           mutate(kt_pval = ifelse(kt_pval == 0, "< 0.001", kt_pval)) %>%
           rename(Variable = varnames,
-                 `Chi-squared` = kt_stat,
+                 `H` = kt_stat,
                  `p-value` = kt_pval)  
 
+cluster_chars <- imd_la_subdoms %>%
+                 group_by(cluster) %>%
+                 summarise(area_median = median(area),
+                           area_iqr = IQR(area),
+                           total_pop_median = median(total_pop, na.rm = TRUE),
+                           total_pop_iqr = IQR(total_pop, na.rm = TRUE),
+                           percent_under18_median = median(percent_under18, na.rm = TRUE),
+                           percent_under18_iqr = IQR(percent_under18, na.rm = TRUE),
+                           percent_over65_median = median(percent_65plus, na.rm = TRUE),
+                           percent_over65_iqr = IQR(percent_65plus, na.rm = TRUE),
+                           percent_ethnic_median = median(percent_ethnic, na.rm = TRUE),
+                           percent_ethnic_iqr = IQR(percent_ethnic, na.rm = TRUE),
+                           percent_rural_median = median(percent_rural, na.rm = TRUE),
+                           percent_rural_iqr = IQR(percent_rural, na.rm = TRUE)) %>%
+                mutate_if(is.numeric,
+                          round,
+                          digits = 2) %>%
+                mutate(Area = paste0(area_median, " (", area_iqr, ")"),
+                       `Total population` = paste0(total_pop_median, " (", total_pop_iqr, ")"),
+                       `% aged under 18` = paste0(percent_under18_median, " (", percent_under18_iqr, ")"),
+                       `% aged 65 and over` = paste0(percent_over65_median, " (", percent_over65_iqr, ")"),
+                       `% ethnic minority`= paste0(percent_ethnic_median, " (", percent_ethnic_iqr, ")"),
+                       `% living in rural areas`= paste0(percent_rural_median, " (", percent_rural_iqr, ")")) %>%
+                select(Area, 
+                       `Total population`, 
+                       `% aged under 18`,
+                       `% aged 65 and over`,
+                       `% ethnic minority`,
+                       `% living in rural areas`) %>%
+                t() %>%
+                as.data.frame() %>%
+                rownames_to_column() 
+
+colnames(cluster_chars) <- c("Variable", paste0("cluster ", 1:(ncol(cluster_chars)-1)))
+
+table3 <- merge(table3, cluster_chars,
+                by = "Variable") %>%
+          select(Variable,
+                 5:9,
+                 2:4) %>%
+          mutate(Variable = factor(Variable,
+                                   levels = c("Area",
+                                              "Total population",
+                                              "% aged under 18",
+                                              "% aged 65 and over",
+                                              "% ethnic minority",
+                                              "% living in rural areas"))) %>%
+          arrange(Variable)
+
 write.csv(table3,
-          file = "KW_test_table.csv",
+          file = "table3.csv",
           row.names = FALSE)
 
-#### Figure 3 ####
+#### Figure 3: PLotting cluster characteristics ####
 
 # Add appropriate axis labels and titles
 g_area <- g_area + 
           labs(title = "Geographic size",
-               y = "area (hectares)")
+               y = "area (10,000 hectares)")
 
 g_total_pop <- g_total_pop + 
                labs(title = "Population size",
