@@ -281,6 +281,7 @@ table1 <- cluster_table %>%
                  employment = paste0(employment_med, " (", employment_iqr, ")"),
                  education = paste0(education_med, " (", education_iqr, ")"),
                  health = paste0(health_med, " (", health_iqr, ")"),
+                 crime = paste0(crime_med, " (", crime_iqr, ")"),
                  housing = paste0(housing_med, " (", housing_iqr, ")"),
                  environment = paste0(environment_med, " (", environment_iqr, ")")
                  ) %>%
@@ -291,6 +292,7 @@ table1 <- cluster_table %>%
                  employment,
                  education,
                  health,
+                 crime,
                  housing,
                  environment)
 
