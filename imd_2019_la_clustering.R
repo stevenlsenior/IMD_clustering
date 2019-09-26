@@ -29,18 +29,18 @@ library(fingertipsR)      # For getting data from Fingertips
 
 #### Download files ####
 
-if(!file.exists("imd_la_2015.xlsx")){
-  download.file(url = "https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/464465/File_11_ID_2015_Upper-tier_Local_Authority_Summaries.xlsx",
-                destfile = "imd_la_2015.xlsx")
+if(!file.exists("imd_la_2019.xlsx")){
+  download.file(url = "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/834001/File_11_-_IoD2019_Local_Authority_District_Summaries__upper-tier__.xlsx",
+                destfile = "imd_la_2019.xlsx")
 }
 
 #### Load data ####
 
-imd_la <- read_xlsx(path = "imd_la_2015.xlsx",
+imd_la <- read_xlsx(path = "imd_la_2019.xlsx",
                     sheet = 2)
 
 for(i in 3:11){
-  t <- read_xlsx(path = "imd_la_2015.xlsx",
+  t <- read_xlsx(path = "imd_la_2019.xlsx",
                  sheet = i)
   imd_la <- merge(imd_la, t,
                   by = 1:2)
@@ -51,10 +51,10 @@ rm(t)
 #### Select only subdomains ####
 
 # Use average scores
-imd_la_subdoms <- dplyr::select(imd_la,
-                                1:2,
-                                contains("Average score"),
-                                -contains("Rank")) 
+imd_la_subdoms <- select(imd_la,
+                         1:2,
+                         contains("Average score"),
+                         -contains("Rank")) 
 
 # rename variables
 names(imd_la_subdoms) <- c("utla_code",
@@ -94,35 +94,36 @@ imd_la_subdoms <- select(imd_la_subdoms,
 # Perform clustering with shc()
 shc_result <- shc(as.matrix(imd_la_subdoms[,5:11]),
                   linkage = "complete",
-                  alpha = 0.001,
+                  alpha = 0.05,
                   n_sim = 500)
 
 shc_result$hc_dat$labels <- imd_la_subdoms$utla_name
 
 # Add cluster membership to data
-imd_la_subdoms <- mutate(imd_la_subdoms,
-                         cluster = factor(shcutree(shc_result)))
+# Source new function for workaround
+source("shcutree2.R")
+imd_la_subdoms <- mutate(imd_la_subdoms, cluster = factor(shcutree2(shc_result)))
 
 #### Figure 1a: Dendrogram ####
 fig1a <- plot(shc_result,
               use_labs = FALSE,
               groups = imd_la_subdoms$cluster) + 
-       theme_minimal() +
-       scale_fill_brewer(type = "qualitative",
-                         palette = "Set1",
-                         name = "Cluster") +
-       labs(title = "Clustering dendrogram") +
-       #theme(plot.title = element_text(size = 20),
-       #      legend.title = element_text(size = 16),
-       #      legend.text = element_text(size = 14)) + 
-       NULL
+  theme_minimal() +
+  scale_fill_brewer(type = "qualitative",
+                    palette = "Set1",
+                    name = "Cluster") +
+  labs(title = "Clustering dendrogram") +
+  #theme(plot.title = element_text(size = 20),
+  #      legend.title = element_text(size = 16),
+  #      legend.text = element_text(size = 14)) + 
+  NULL
 
 #### Figure 1b: Mapping clusters ####
 
 # Get map data
 if(!file.exists("la_map.Rdata")){
   la_map <- geojson_read("https://opendata.arcgis.com/datasets/d3d7b7538c934cf29db791a705631e24_4.geojson",
-                        what = "sp") 
+                         what = "sp") 
   save(la_map, file = "la_map.Rdata")
 }else{
   load("la_map.Rdata")  
@@ -161,7 +162,7 @@ fig1b <- ggplot(data = map,
 
 if(!file.exists("london_boroughs.csv")){
   download.file(url = "https://data.london.gov.uk/download/london-borough-profiles/c1693b82-68b1-44ee-beb2-3decf17dc1f8/london-borough-profiles.csv",
-              destfile = "london_boroughs.csv")
+                destfile = "london_boroughs.csv")
 }
 
 london <- read.csv("london_boroughs.csv",
@@ -174,10 +175,10 @@ map_london <- filter(map, id %in% london$Code)
 
 # Map London boroughs only
 fig1b_insert <- ggplot(data = map_london,
-                aes(y = lat, 
-                    x = long,
-                    group = group,
-                    fill = cluster)) +
+                       aes(y = lat, 
+                           x = long,
+                           group = group,
+                           fill = cluster)) +
   geom_polygon(col = "black") +
   theme_minimal() +
   labs(title = "London",
@@ -194,12 +195,12 @@ fig1b_insert <- ggplot(data = map_london,
   panel_border(colour = "black")
 
 fig1b2 <- ggdraw() +
-          draw_plot(fig1b) +
-          draw_plot(fig1b_insert,
-                    height = 0.2,
-                    width = 0.2,
-                    x = 0.7,
-                    y = 0.7)
+  draw_plot(fig1b) +
+  draw_plot(fig1b_insert,
+            height = 0.2,
+            width = 0.2,
+            x = 0.7,
+            y = 0.7)
 
 # Plot figures 1a and 1b together.
 fig1 <- plot_grid(fig1a, fig1b2, 
@@ -208,9 +209,9 @@ fig1 <- plot_grid(fig1a, fig1b2,
 
 # Add a shared title and caption
 title_gg <- ggplot() + 
-            labs(title = "Figure 1: Heirarchical clustering of local authorities by subdomains of deprivation") +
-            theme_minimal() +
-            theme(plot.title = element_text(face = "bold")) 
+  labs(title = "Figure 1: Heirarchical clustering of local authorities by subdomains of deprivation") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold")) 
 
 cap_gg <- ggplot() +
   labs(caption = "A: Clustering dendrogram showing the clustering structure. Nodes at which clustering was statistically significant are indicated by red branches. \nP-values for significant nodes are presented. Five statistically significant clusters are identified, indicated by the coloured bars at the bottom.\nFWER - family-wise error rate.\n
@@ -226,7 +227,7 @@ fig1 <- plot_grid(title_gg,
                   ncol = 1, 
                   rel_heights = c(0.15, 1, 0.3))
 
-ggsave(filename = "figure1.jpg",
+ggsave(filename = "figure1_2019.jpg",
        plot = fig1,
        width = 24,
        height = 14,
@@ -239,7 +240,7 @@ ggsave(filename = "figure1.jpg",
 # Create table of clusters vs IMD quintile
 table2 <- ftable(imd_la_subdoms$cluster,
                  imd_la_subdoms$imd_quintile) %>%
-          addmargins()
+  addmargins()
 
 colnames(table2) <- c(as.character(1:5), "total")
 rownames(table2) <- c(as.character(1:5), "total")
@@ -270,31 +271,31 @@ cluster_table <- imd_la_subdoms %>%
             housing_iqr = IQR(housing),
             environment_med = median(living_env),
             environment_iqr = IQR(living_env)) %>%
-            mutate_if(is.double,
-                      round,
-                      digits = 2)
+  mutate_if(is.double,
+            round,
+            digits = 2)
 
 # table for paper
 table1 <- cluster_table %>%
-          mutate(IMD_score = paste0(IMD_score_med, " (", IMD_score_iqr, ")"),
-                 income = paste0(income_med, " (", income_iqr, ")"),
-                 employment = paste0(employment_med, " (", employment_iqr, ")"),
-                 education = paste0(education_med, " (", education_iqr, ")"),
-                 health = paste0(health_med, " (", health_iqr, ")"),
-                 crime = paste0(crime_med, " (", crime_iqr, ")"),
-                 housing = paste0(housing_med, " (", housing_iqr, ")"),
-                 environment = paste0(environment_med, " (", environment_iqr, ")")
-                 ) %>%
-          select(cluster,
-                 n,
-                 IMD_score,
-                 income,
-                 employment,
-                 education,
-                 health,
-                 crime,
-                 housing,
-                 environment)
+  mutate(IMD_score = paste0(IMD_score_med, " (", IMD_score_iqr, ")"),
+         income = paste0(income_med, " (", income_iqr, ")"),
+         employment = paste0(employment_med, " (", employment_iqr, ")"),
+         education = paste0(education_med, " (", education_iqr, ")"),
+         health = paste0(health_med, " (", health_iqr, ")"),
+         crime = paste0(crime_med, " (", crime_iqr, ")"),
+         housing = paste0(housing_med, " (", housing_iqr, ")"),
+         environment = paste0(environment_med, " (", environment_iqr, ")")
+  ) %>%
+  select(cluster,
+         n,
+         IMD_score,
+         income,
+         employment,
+         education,
+         health,
+         crime,
+         housing,
+         environment)
 
 write.csv(table1,
           file = "table1.csv",
@@ -348,7 +349,7 @@ g5 <- ggplot(data = imd_la_subdoms %>%
        title = "Figure 2: Cluster deprivation profiles",
        subtitle = "Median IMD subdomain scores by cluster")
 
-ggsave(filename = "figure2.jpg",
+ggsave(filename = "figure2_2019.jpg",
        plot = g5,
        width = 24,
        height = 12,
@@ -401,13 +402,13 @@ lookup <- lookup_fixer(regions)
 
 # Need to match on names - fix names that don't match
 urban_rural <- urban_rural %>%
-               mutate(Name = recode(Name,
-                                    "Bristol City of" = "Bristol, City of",
-                                    "Durham" = "County Durham",
-                                    "Herefordshire County of" = "Herefordshire, County of",
-                                    "King`s Lynn and West Norfolk" = "King's Lynn and West Norfolk",
-                                    "Kingston upon Hull City of" = "Kingston upon Hull, City of",
-                                    "St. Edmundsbury" = "St Edmundsbury"))
+  mutate(Name = recode(Name,
+                       "Bristol City of" = "Bristol, City of",
+                       "Durham" = "County Durham",
+                       "Herefordshire County of" = "Herefordshire, County of",
+                       "King`s Lynn and West Norfolk" = "King's Lynn and West Norfolk",
+                       "Kingston upon Hull City of" = "Kingston upon Hull, City of",
+                       "St. Edmundsbury" = "St Edmundsbury"))
 
 # Merge lower to upper tier lookup with urban-rural data
 urban_rural <- merge(urban_rural, lookup,
@@ -417,13 +418,13 @@ urban_rural <- merge(urban_rural, lookup,
 
 # Summarise urban-rural data for upper tier local authorities
 urban_rural <- urban_rural %>%
-               group_by(UTLA16CD, UTLA16NM) %>%
-               summarise(total_pop = sum(`Total Population1`),
-                         rural_pop = sum(`Total Population1` * `Rural% (including Large Market Town population)2` / 100)) %>%
-               mutate(percent_rural = rural_pop * 100 / total_pop) %>%
-               select(utla_code = UTLA16CD,
-                      utla_name = UTLA16NM,
-                      percent_rural)
+  group_by(UTLA16CD, UTLA16NM) %>%
+  summarise(total_pop = sum(`Total Population1`),
+            rural_pop = sum(`Total Population1` * `Rural% (including Large Market Town population)2` / 100)) %>%
+  mutate(percent_rural = rural_pop * 100 / total_pop) %>%
+  select(utla_code = UTLA16CD,
+         utla_name = UTLA16NM,
+         percent_rural)
 
 imd_la_subdoms <- merge(imd_la_subdoms, urban_rural)
 
@@ -434,30 +435,30 @@ rm(urban_rural)
 
 # Get demographic data from fingertips
 inds <- indicators() %>%
-        filter(grepl("Supporting information", IndicatorName))
+  filter(grepl("Supporting information", IndicatorName))
 
 # Percentages of under 18s, over 65s, and ethnic minorities
 demog <- fingertips_data(IndicatorID = unique(inds$IndicatorID)) %>%
-         filter(AreaType == "County & UA",
-                Timeperiod == 2016,
-                Sex == "Persons") %>%
-         select(utla_code = AreaCode,
-                ind = IndicatorName,
-                value = Value) %>%
-         spread(key = ind,
-                value = value) %>%
-         rename(percent_65plus = 2,
-                percent_under18 = 3,
-                percent_ethnic = 4)
+  filter(AreaType == "County & UA (pre 4/19)",
+         Timeperiod == 2016,
+         Sex == "Persons") %>%
+  select(utla_code = AreaCode,
+         ind = IndicatorName,
+         value = Value) %>%
+  spread(key = ind,
+         value = value) %>%
+  rename(percent_65plus = 2,
+         percent_under18 = 3,
+         percent_ethnic = 4)
 
 # Total population numbers
 pop <- fingertips_data(IndicatorID = inds$IndicatorID[1]) %>%
-       filter(AreaType == "County & UA",
-              Timeperiod == 2016,
-              Sex == "Persons") %>%
-       select(utla_code = AreaCode,
-              total_pop = Denominator) %>%
-       mutate(total_pop = total_pop / 100000)
+  filter(AreaType == "County & UA (pre 4/19)",
+         Timeperiod == 2016,
+         Sex == "Persons") %>%
+  select(utla_code = AreaCode,
+         total_pop = Denominator) %>%
+  mutate(total_pop = total_pop / 100000)
 
 # Merge percentages and total population data together
 demog <- merge(demog, pop)
@@ -489,11 +490,11 @@ utla_sizes$`Area code 2`[utla_sizes$...3 == "Northumberland UA 5"] <- "E06000057
 
 # Select upper tier local authorities and scale numeric to 10,000s of HA
 utla_sizes <- utla_sizes %>%
-              select(utla_code = 1,
-                     area = Area) %>%
-              filter(!is.na(utla_code),
-                     utla_code %in% imd_la_subdoms$utla_code) %>%
-              mutate(area = as.numeric(area)/10000)
+  select(utla_code = 1,
+         area = Area) %>%
+  filter(!is.na(utla_code),
+         utla_code %in% imd_la_subdoms$utla_code) %>%
+  mutate(area = as.numeric(area)/10000)
 
 # Merge with main data set
 imd_la_subdoms <- merge(imd_la_subdoms, utla_sizes)
@@ -506,8 +507,8 @@ rm(utla_sizes)
 # write a function to do testing and plotting of comparisons
 subdom_test <- function(v, m = "bonferroni"){
   d <- imd_la_subdoms %>% 
-       mutate(cluster = factor(cluster)) %>%
-       select(cluster, var = contains(v))
+    mutate(cluster = factor(cluster)) %>%
+    select(cluster, var = contains(v))
   
   kt <- kruskal.test(var ~ cluster,
                      data = d)
@@ -520,15 +521,15 @@ subdom_test <- function(v, m = "bonferroni"){
               aes(x = cluster,
                   y = var,
                   fill = cluster)) +
-       geom_boxplot() +
-       labs(title = "",
-            x = "cluster",
-            y = v) +
-       theme_minimal() +
-       scale_fill_brewer(type = "qualitative",
-                           palette = "Set1") +
-       guides(fill = FALSE)
-
+    geom_boxplot() +
+    labs(title = "",
+         x = "cluster",
+         y = v) +
+    theme_minimal() +
+    scale_fill_brewer(type = "qualitative",
+                      palette = "Set1") +
+    guides(fill = FALSE)
+  
   return(list(kt, dt, g))
   
 }
@@ -566,62 +567,62 @@ kt_table <- tibble(varnames, kt_stat, df, kt_pval)
 
 #### Table 3: Cluster characteristics ####
 table3 <- kt_table %>%
-          mutate(kt_stat = round(kt_stat, digits = 2)) %>%
-          mutate(kt_pval = ifelse(kt_pval < 0.001, 0, kt_pval)) %>%
-          mutate(kt_pval = round(kt_pval, digits = 3)) %>%
-          mutate(kt_pval = ifelse(kt_pval == 0, "< 0.001", kt_pval)) %>%
-          rename(Variable = varnames,
-                 `H` = kt_stat,
-                 `p-value` = kt_pval)  
+  mutate(kt_stat = round(kt_stat, digits = 2)) %>%
+  mutate(kt_pval = ifelse(kt_pval < 0.001, 0, kt_pval)) %>%
+  mutate(kt_pval = round(kt_pval, digits = 3)) %>%
+  mutate(kt_pval = ifelse(kt_pval == 0, "< 0.001", kt_pval)) %>%
+  rename(Variable = varnames,
+         `H` = kt_stat,
+         `p-value` = kt_pval)  
 
 cluster_chars <- imd_la_subdoms %>%
-                 group_by(cluster) %>%
-                 summarise(area_median = median(area),
-                           area_iqr = IQR(area),
-                           total_pop_median = median(total_pop, na.rm = TRUE),
-                           total_pop_iqr = IQR(total_pop, na.rm = TRUE),
-                           percent_under18_median = median(percent_under18, na.rm = TRUE),
-                           percent_under18_iqr = IQR(percent_under18, na.rm = TRUE),
-                           percent_over65_median = median(percent_65plus, na.rm = TRUE),
-                           percent_over65_iqr = IQR(percent_65plus, na.rm = TRUE),
-                           percent_ethnic_median = median(percent_ethnic, na.rm = TRUE),
-                           percent_ethnic_iqr = IQR(percent_ethnic, na.rm = TRUE),
-                           percent_rural_median = median(percent_rural, na.rm = TRUE),
-                           percent_rural_iqr = IQR(percent_rural, na.rm = TRUE)) %>%
-                mutate_if(is.numeric,
-                          round,
-                          digits = 2) %>%
-                mutate(Area = paste0(area_median, " (", area_iqr, ")"),
-                       `Total population` = paste0(total_pop_median, " (", total_pop_iqr, ")"),
-                       `% aged under 18` = paste0(percent_under18_median, " (", percent_under18_iqr, ")"),
-                       `% aged 65 and over` = paste0(percent_over65_median, " (", percent_over65_iqr, ")"),
-                       `% ethnic minority`= paste0(percent_ethnic_median, " (", percent_ethnic_iqr, ")"),
-                       `% living in rural areas`= paste0(percent_rural_median, " (", percent_rural_iqr, ")")) %>%
-                select(Area, 
-                       `Total population`, 
-                       `% aged under 18`,
-                       `% aged 65 and over`,
-                       `% ethnic minority`,
-                       `% living in rural areas`) %>%
-                t() %>%
-                as.data.frame() %>%
-                rownames_to_column() 
+  group_by(cluster) %>%
+  summarise(area_median = median(area),
+            area_iqr = IQR(area),
+            total_pop_median = median(total_pop, na.rm = TRUE),
+            total_pop_iqr = IQR(total_pop, na.rm = TRUE),
+            percent_under18_median = median(percent_under18, na.rm = TRUE),
+            percent_under18_iqr = IQR(percent_under18, na.rm = TRUE),
+            percent_over65_median = median(percent_65plus, na.rm = TRUE),
+            percent_over65_iqr = IQR(percent_65plus, na.rm = TRUE),
+            percent_ethnic_median = median(percent_ethnic, na.rm = TRUE),
+            percent_ethnic_iqr = IQR(percent_ethnic, na.rm = TRUE),
+            percent_rural_median = median(percent_rural, na.rm = TRUE),
+            percent_rural_iqr = IQR(percent_rural, na.rm = TRUE)) %>%
+  mutate_if(is.numeric,
+            round,
+            digits = 2) %>%
+  mutate(Area = paste0(area_median, " (", area_iqr, ")"),
+         `Total population` = paste0(total_pop_median, " (", total_pop_iqr, ")"),
+         `% aged under 18` = paste0(percent_under18_median, " (", percent_under18_iqr, ")"),
+         `% aged 65 and over` = paste0(percent_over65_median, " (", percent_over65_iqr, ")"),
+         `% ethnic minority`= paste0(percent_ethnic_median, " (", percent_ethnic_iqr, ")"),
+         `% living in rural areas`= paste0(percent_rural_median, " (", percent_rural_iqr, ")")) %>%
+  select(Area, 
+         `Total population`, 
+         `% aged under 18`,
+         `% aged 65 and over`,
+         `% ethnic minority`,
+         `% living in rural areas`) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column() 
 
 colnames(cluster_chars) <- c("Variable", paste0("cluster ", 1:(ncol(cluster_chars)-1)))
 
 table3 <- merge(table3, cluster_chars,
                 by = "Variable") %>%
-          select(Variable,
-                 5:9,
-                 2:4) %>%
-          mutate(Variable = factor(Variable,
-                                   levels = c("Area",
-                                              "Total population",
-                                              "% aged under 18",
-                                              "% aged 65 and over",
-                                              "% ethnic minority",
-                                              "% living in rural areas"))) %>%
-          arrange(Variable)
+  select(Variable,
+         5:9,
+         2:4) %>%
+  mutate(Variable = factor(Variable,
+                           levels = c("Area",
+                                      "Total population",
+                                      "% aged under 18",
+                                      "% aged 65 and over",
+                                      "% ethnic minority",
+                                      "% living in rural areas"))) %>%
+  arrange(Variable)
 
 write.csv(table3,
           file = "table3.csv",
@@ -631,12 +632,12 @@ write.csv(table3,
 
 # Add appropriate axis labels and titles
 g_area <- g_area + 
-          labs(title = "Geographic size",
-               y = "area (10,000 hectares)")
+  labs(title = "Geographic size",
+       y = "area (10,000 hectares)")
 
 g_total_pop <- g_total_pop + 
-               labs(title = "Population size",
-                    y = "population (100,000s)")
+  labs(title = "Population size",
+       y = "population (100,000s)")
 
 g_percent_under18 <- g_percent_under18 + 
   labs(title = "Population aged under 18",
@@ -678,12 +679,12 @@ cap_gg3 <- ggplot() +
         plot.caption = element_text(hjust = 0)) 
 
 fig3 <- plot_grid(title_gg3, 
-                          fig3, 
-                          cap_gg3,
-                          ncol = 1, 
-                          rel_heights = c(0.1, 1, 0.25))
+                  fig3, 
+                  cap_gg3,
+                  ncol = 1, 
+                  rel_heights = c(0.1, 1, 0.25))
 
-ggsave(filename = "figure3.jpg",
+ggsave(filename = "figure3_2019.jpg",
        plot = fig3,
        width = 24,
        height = 14,
