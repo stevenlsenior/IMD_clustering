@@ -72,7 +72,9 @@ names(imd_la_subdoms) <- c("utla_code",
 
 # Create IMD quintiles variable
 imd_la_subdoms <- mutate(imd_la_subdoms,
-                         imd_quintile = ntile(imd, n = 5))
+                         imd_quintile = ntile(imd, n = 5)) %>%
+                  filter(utla_name != "City of London",
+                         utla_name != "Isles of Scilly")
 
 imd_la_subdoms <- imd_la_subdoms[ , c(1:2, 13, 3:12)]
 
@@ -94,15 +96,13 @@ imd_la_subdoms <- select(imd_la_subdoms,
 # Perform clustering with shc()
 shc_result <- shc(as.matrix(imd_la_subdoms[,5:11]),
                   linkage = "complete",
-                  alpha = 0.05,
+                  alpha = 0.01,
                   n_sim = 500)
 
 shc_result$hc_dat$labels <- imd_la_subdoms$utla_name
 
 # Add cluster membership to data
-# Source new function for workaround
-source("shcutree2.R")
-imd_la_subdoms <- mutate(imd_la_subdoms, cluster = factor(shcutree2(shc_result)))
+imd_la_subdoms <- mutate(imd_la_subdoms, cluster = factor(shcutree(shc_result)))
 
 #### Figure 1a: Dendrogram ####
 fig1a <- plot(shc_result,
