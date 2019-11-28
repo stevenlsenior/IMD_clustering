@@ -1,6 +1,5 @@
 #### Install packages ####
-# install.packages(c("devtools", "readxl", "ape", "geojsonio",
-#                   "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
+# install.packages(c("devtools", "readxl", "ape", "rgdal", "GISTools", "ggalt", "broom", "tidyverse", "FSA",
 #                     "cowplot", "impute", "preprocessCore", "Go.db", "AnnotationDbi", "fingertipsR"),
 #                  dependencies = TRUE)
 
@@ -15,7 +14,6 @@ library(sigclust2)        # For clustering
 library(devtools)         # For installing packages
 library(readxl)           # For reading excel files
 library(ape)              # For plotting dendrograms
-library(geojsonio)        # For managing geojson
 library(rgdal)            # For mapping
 library(GISTools)         # For mapping
 library(ggalt)            # For mapping
@@ -48,7 +46,7 @@ for(i in 3:11){
 
 rm(t)
 
-#### Select only subdomains ####
+#### Select only domains ####
 
 # Use average scores
 imd_la_subdoms <- dplyr::select(imd_la,
@@ -108,21 +106,18 @@ fig1a <- plot(shc_result,
               use_labs = FALSE,
               groups = imd_la_subdoms$cluster) + 
        theme_minimal() +
+       labs(title = NULL) +
        scale_fill_brewer(type = "qualitative",
                          palette = "Set1",
                          name = "Cluster") +
-       labs(title = "Clustering dendrogram") +
-       #theme(plot.title = element_text(size = 20),
-       #      legend.title = element_text(size = 16),
-       #      legend.text = element_text(size = 14)) + 
-       NULL
+       theme(legend.position = "none")
 
 #### Figure 1b: Mapping clusters ####
 
 # Get map data
 if(!file.exists("la_map.Rdata")){
   la_map <- geojson_read("https://opendata.arcgis.com/datasets/d3d7b7538c934cf29db791a705631e24_4.geojson",
-                        what = "sp") 
+                         what = "sp") 
   save(la_map, file = "la_map.Rdata")
 }else{
   load("la_map.Rdata")  
@@ -141,8 +136,7 @@ fig1b <- ggplot(data = map,
                     fill = cluster)) +
   geom_polygon(col = "black") +
   theme_minimal() +
-  labs(title = "Map of clusters",
-       x = NULL,
+  labs(x = NULL,
        y = NULL) +
   scale_fill_brewer(type = "qualitative",
                     palette = "Set1",
@@ -180,8 +174,7 @@ fig1b_insert <- ggplot(data = map_london,
                     fill = cluster)) +
   geom_polygon(col = "black") +
   theme_minimal() +
-  labs(title = "London",
-       x = NULL,
+  labs(x = NULL,
        y = NULL) +
   scale_fill_brewer(type = "qualitative",
                     palette = "Set1",
@@ -196,43 +189,38 @@ fig1b_insert <- ggplot(data = map_london,
 fig1b2 <- ggdraw() +
           draw_plot(fig1b) +
           draw_plot(fig1b_insert,
-                    height = 0.2,
-                    width = 0.2,
-                    x = 0.7,
-                    y = 0.7)
+                    height = 0.25,
+                    width = 0.25,
+                    x = 0.55,
+                    y = 0.65)
 
 # Plot figures 1a and 1b together.
-fig1 <- plot_grid(fig1a, fig1b2, 
-                  labels = "AUTO",
-                  ncol = 2)
+fig1_main <- plot_grid(fig1a, fig1b2, 
+                       labels = "auto",
+                       ncol = 1)
 
-# Add a shared title and caption
-title_gg <- ggplot() + 
-            labs(title = "Figure 1: Heirarchical clustering of local authorities by subdomains of deprivation") +
-            theme_minimal() +
-            theme(plot.title = element_text(face = "bold")) 
+# Add a shared caption
 
 cap_gg <- ggplot() +
-  labs(caption = "A: Clustering dendrogram showing the clustering structure. Nodes at which clustering was statistically significant are indicated by red branches. \nP-values for significant nodes are presented. Five statistically significant clusters are identified, indicated by the coloured bars at the bottom.\nFWER - family-wise error rate.\n
-B: Map showing the geographic distribution of the significant clusters identified. Cluster colours correspond to those in panel A.
-") +
+  labs(caption = str_wrap("Fig. 1 (a) Clustering dendrogram showing the clustering structure. Nodes at which clustering was statistically significant are indicated by red branches. \nP-values for significant nodes are presented. Five statistically significant clusters are identified, indicated by the coloured bars at the bottom.\nFWER - family-wise error rate.\n
+(b) Map showing the geographic distribution of the significant clusters identified.",
+                          width = 60)) +
   theme_minimal() +
   theme(plot.title = element_text(face = "bold"),
         plot.caption = element_text(hjust = 0))   
 
-fig1 <- plot_grid(title_gg, 
-                  fig1, 
+fig1 <- plot_grid(fig1_main, 
                   cap_gg,
                   ncol = 1, 
-                  rel_heights = c(0.15, 1, 0.3))
+                  rel_heights = c(1, 0.25))
 
-ggsave(filename = "figure1.jpg",
+ggsave(filename = "figure1.tiff",
        plot = fig1,
-       width = 24,
-       height = 14,
+       width = 9,
+       height = 16,
        units = "cm",
-       device = "jpeg",
-       quality = 100)
+       device = "tiff",
+       dpi = "print")
 
 #### Table 2: Comparing clusters and IMD quintiles ####
 
@@ -300,9 +288,9 @@ write.csv(table1,
           file = "table1.csv",
           row.names = FALSE)
 
-#### Figure 2: Plotting subdomain scores ####
+#### Figure 2: Plotting domain scores ####
 # Use boxplots
-g5 <- ggplot(data = imd_la_subdoms %>%
+fig2 <- ggplot(data = imd_la_subdoms %>%
                select(-imd, -imd_quintile) %>%
                gather(key = "variable",
                       value = "value",
@@ -319,12 +307,15 @@ g5 <- ggplot(data = imd_la_subdoms %>%
                                                    "crime",
                                                    "housing",
                                                    "living_env"),
-                                        ordered = TRUE)),
+                                        ordered = TRUE)) %>%
+               mutate(variable = fct_recode(variable,
+                                            `living env.` = "living_env",
+                                            education = "educ_skill")),
              aes(x = variable,
                  y = value,
-                 fill = factor(cluster))) +
+                 fill = cluster)) +
   geom_boxplot() +
-  facet_wrap(~factor(cluster)) +
+  facet_wrap(~factor(cluster), ncol = 2) +
   stat_identity(yintercept=0, 
                 lty = "dashed",
                 geom='hline', 
@@ -337,24 +328,24 @@ g5 <- ggplot(data = imd_la_subdoms %>%
         #legend.text = element_text(size = 14),
         #legend.title = element_text(size = 14),
         #axis.text.x = element_text(size = 14),
-        axis.title.y = element_text(face = "bold")
+        #axis.title.y = element_text(face = "bold")
   ) +
   scale_fill_brewer(type = "qualitative",
                     palette = "Set1") +
-  theme(axis.text.x = element_text(angle = 90)) +
+  theme(axis.text.x = element_text(angle = 90),
+        plot.caption = element_text(hjust = 0)) +
   guides(fill = FALSE) +
   labs(x = NULL,
        y = "sub-domain z-scores",
-       title = "Figure 2: Cluster deprivation profiles",
-       subtitle = "Median IMD subdomain scores by cluster")
+       caption = "Fig. 2: Boxplots of domain z-scores for the five clusters.")
 
-ggsave(filename = "figure2.jpg",
-       plot = g5,
-       width = 24,
-       height = 12,
+ggsave(filename = "figure2.tiff",
+       plot = fig2,
+       width = 9,
+       height = 16,
        units = "cm",
-       device = "jpeg",
-       quality = 100)
+       device = "tiff",
+       dpi = "print")
 
 #### Get urban-rural data and merge with main dataset ####
 
@@ -438,7 +429,7 @@ inds <- indicators() %>%
 
 # Percentages of under 18s, over 65s, and ethnic minorities
 demog <- fingertips_data(IndicatorID = unique(inds$IndicatorID)) %>%
-         filter(AreaType == "County & UA",
+         filter(AreaType == "County & UA (pre 4/19)",
                 Timeperiod == 2016,
                 Sex == "Persons") %>%
          select(utla_code = AreaCode,
@@ -522,7 +513,7 @@ subdom_test <- function(v, m = "bonferroni"){
                   fill = cluster)) +
        geom_boxplot() +
        labs(title = "",
-            x = "cluster",
+            x = NULL,
             y = v) +
        theme_minimal() +
        scale_fill_brewer(type = "qualitative",
@@ -627,66 +618,73 @@ write.csv(table3,
           file = "table3.csv",
           row.names = FALSE)
 
-#### Figure 3: PLotting cluster characteristics ####
+#### Figure 3: Plotting cluster characteristics ####
 
 # Add appropriate axis labels and titles
 g_area <- g_area + 
           labs(title = "Geographic size",
-               y = "area (10,000 hectares)")
+               y = "area (10,000 ha)") +
+          theme(plot.title = element_text(size = 10),
+                axis.title = element_text(size = 9))
 
 g_total_pop <- g_total_pop + 
                labs(title = "Population size",
-                    y = "population (100,000s)")
+                    y = "population (100,000s)")+
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 9))
 
 g_percent_under18 <- g_percent_under18 + 
-  labs(title = "Population aged under 18",
-       y = "%")
+  labs(title = "Aged under 18",
+       y = "%")+
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 9))
 
 g_percent_65plus <- g_percent_65plus + 
-  labs(title = "Population aged 65 and over",
-       y = "%")       
+  labs(title = "Aged 65+",
+       y = "%")     +
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 9))  
 
 g_percent_ethnic <- g_percent_ethnic + 
   labs(title = "Ethnic diversity",
-       y = "%")
+       y = "%")+
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 9))
 
 g_percent_rural <- g_percent_rural + 
-  labs(title = "Population in rural areas",
-       y = "%")
+  labs(title = "Rural population",
+       y = "%")+
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 9))
 
 # Plot comparisons
-fig3 <- plot_grid(g_area, 
-                  g_total_pop, 
-                  g_percent_under18,
-                  g_percent_65plus,
-                  g_percent_ethnic,
-                  g_percent_rural,
-                  cols = 3,
-                  labels = "AUTO")
+fig3_main <- plot_grid(g_area, 
+                       g_total_pop, 
+                       g_percent_under18,
+                       g_percent_65plus,
+                       g_percent_ethnic,
+                       g_percent_rural,
+                       ncol = 2,
+                       labels = "auto")
 
-# Add title and caption
-
-title_gg3 <- ggplot() + 
-  labs(title = "Figure 3: Cluster characteristics") +
-  theme_minimal() +
-  theme(plot.title = element_text(face = "bold")) 
+# Add caption
 
 cap_gg3 <- ggplot() +
-  labs(caption = "Characterisation of clusters according to geographic size and demographic characteristics.\nA: Geographic size in hectares (source: ONS).\nB: Population size (100,000s) (source: PHE; 2016 data).\nC: Percentage of population aged under 18 years (source: PHE; 2016 data).\nD: Percentage of population aged 65 years and older (source: PHE; 2016 data).\nE: Percentage of population from black and minority ethnic backgrounds (source: PHE; 2016 data).\nF: Percentage of population living in rural areas (including large market towns; source: ONS; 2011 data)") +
+  labs(caption = str_wrap("Fig. 3: Characterisation of clusters according to: (a) Geographic size in hectares (source: ONS), (b) Population size (100,000s) (source: PHE; 2016 data), (c) Percentage of population aged under 18 years (source: PHE; 2016 data). (d) Percentage of population aged 65 years and older (source: PHE; 2016 data), (e) Percentage of population from black and minority ethnic backgrounds (source: PHE; 2016 data), and (f) Percentage of population living in rural areas (including large market towns; source: ONS; 2011 data)",
+                          width = 60)) +
   theme_minimal() +
-  theme(plot.title = element_text(face = "bold"),
-        plot.caption = element_text(hjust = 0)) 
+  theme(plot.caption = element_text(hjust = 0,
+                                    size = 9)) 
 
-fig3 <- plot_grid(title_gg3, 
-                          fig3, 
-                          cap_gg3,
-                          ncol = 1, 
-                          rel_heights = c(0.1, 1, 0.25))
+fig3 <- plot_grid(fig3_main, 
+                  cap_gg3,
+                  ncol = 1, 
+                  rel_heights = c(1, 0.25))
 
-ggsave(filename = "figure3.jpg",
+ggsave(filename = "figure3.tiff",
        plot = fig3,
-       width = 24,
-       height = 14,
+       width = 9,
+       height = 18,
        units = "cm",
-       device = "jpeg",
-       quality = 100)
+       device = "tiff",
+       dpi = "print")
